@@ -1,0 +1,68 @@
+<div class="card">
+  <h2>Ledger</h2>
+  <div class="form-row" id="ledger-dealer-picker">
+    <div>
+      <label>Dealer</label>
+      <select id="ledger-dealer-select"></select>
+    </div>
+    <div>
+      <label>Outstanding</label>
+      <div class="kpi" id="ledger-outstanding">&#8377;0.00</div>
+    </div>
+    <div>
+      <label>Credit status</label>
+      <div><span class="badge badge-green" id="ledger-credit-badge">&mdash;</span></div>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Date</th><th>Head</th><th>Invoice no.</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Running balance</th><th></th></tr></thead>
+    <tbody id="ledger-table-body"></tbody>
+  </table>
+</div>
+
+<div class="modal-overlay" id="detail-modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="detail-modal-title">Invoice detail</h3>
+      <button onclick="closeDetailModal()">&times;</button>
+    </div>
+    <div id="detail-modal-body"></div>
+  </div>
+</div>
+
+<div class="card" id="ledger-entry-card">
+  <h2>Add ledger entry</h2>
+  <form id="new-entry-form">
+    <input type="hidden" id="entry-dealer-code">
+    <div class="form-row">
+      <div><label>Date</label><input id="entry-date" type="date" required></div>
+      <div style="flex:2"><label>Head</label><select id="entry-head" required></select></div>
+      <div><label>Invoice no.</label><input id="entry-invoice"></div>
+      <div><label>Amount (&#8377;)</label><input id="entry-amount" type="number" step="0.01" required></div>
+    </div>
+    <div class="form-row">
+      <div style="flex:3"><label>Remarks</label><input id="entry-remarks"></div>
+    </div>
+    <button type="submit">Add entry</button>
+  </form>
+</div>
+
+<div class="card" id="opening-balance-card">
+  <h2>Set opening balance</h2>
+  <form id="opening-balance-form">
+    <div class="form-row">
+      <div><label>Dealer code</label><input id="ob-dealer-code" required></div>
+      <div><label>Financial year (e.g. 2026-27)</label><input id="ob-fy" required></div>
+      <div><label>Amount (&#8377;)</label><input id="ob-amount" type="number" step="0.01" required></div>
+      <div>
+        <label>Balance type</label>
+        <select id="ob-type">
+          <option value="Dr">Dr &mdash; dealer owes Honda</option>
+          <option value="Cr">Cr &mdash; Honda owes dealer</option>
+        </select>
+      </div>
+      <div><label>Effective date (shows as "Opening Balance" row on this date)</label><input id="ob-effective-date" type="date" required></div>
+    </div>
+    <button type="submit">Set opening balance</button>
+  </form>
+</div>

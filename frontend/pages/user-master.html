@@ -1,0 +1,31 @@
+<div class="card">
+  <h2>Create user</h2>
+  <form id="new-user-form">
+    <div class="form-row">
+      <div><label>Username</label><input id="nu-username" required></div>
+      <div><label>Full name</label><input id="nu-fullname" required></div>
+      <div>
+        <label>Role</label>
+        <select id="nu-role" onchange="onUserRoleChange()">
+          <option value="Admin">Admin</option>
+          <option value="Network Manager">Network Manager</option>
+          <option value="Accounts">Accounts</option>
+          <option value="Dealer">Dealer</option>
+        </select>
+      </div>
+      <div id="nu-dealer-code-block" style="display:none;"><label>Dealer code</label><input id="nu-dealer-code"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Temporary password</label><input id="nu-temp-password" placeholder="Welcome@123"></div>
+    </div>
+    <button type="submit">Create user</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All users</h2>
+  <table>
+    <thead><tr><th>Username</th><th>Full name</th><th>Role</th><th>Dealer code</th><th>Active</th><th>Actions</th></tr></thead>
+    <tbody id="user-table-body"></tbody>
+  </table>
+</div>

@@ -1,0 +1,67 @@
+<div class="card">
+  <h2>ASC Vehicle Sale — Review Queue</h2>
+  <p style="color:#888; font-size:12px;">Har invoice ke liye Registration/Insurance/EW/HPA bharkar submit karo — tabhi yeh Ledger mein post hoga. Submit karne ke 60 minute tak khud edit kar sakte ho.</p>
+  <table>
+    <thead><tr><th>Dealer</th><th>Invoice</th><th>Customer</th><th>Model</th><th>Purchase Type</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="vsr-table-body"></tbody>
+  </table>
+</div>
+
+<div class="card" id="vsr-form-card" style="display:none;">
+  <h2 id="vsr-form-title">Review invoice</h2>
+  <form id="vsr-form">
+    <input type="hidden" id="vsr-queue-id">
+    <div class="form-row">
+      <div><label>Frame No.(s)</label><input id="vsr-frames" disabled></div>
+      <div><label>Total Invoice Amount (raw, &#8377;)</label><input id="vsr-raw-total" disabled></div>
+      <div><label>Purchase Type</label><input id="vsr-purchase-type" disabled></div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Registration</label>
+        <div class="radio-group">
+          <label><input type="radio" name="vsr-reg-type" value="TR Only" onchange="onRegistrationTypeChange()"> TR Only</label>
+          <label><input type="radio" name="vsr-reg-type" value="Permanent Registration" onchange="onRegistrationTypeChange()"> Permanent Registration</label>
+          <label><input type="radio" name="vsr-reg-type" value="No Registration" onchange="onRegistrationTypeChange()"> No Registration</label>
+        </div>
+      </div>
+      <div><label>Registration Amount (&#8377;)</label><input id="vsr-reg-amount" type="number" step="0.01"></div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Insurance</label>
+        <div class="radio-group">
+          <label><input type="radio" name="vsr-ins-type" value="Amount" onchange="onInsuranceTypeChange()" checked> Amount</label>
+          <label><input type="radio" name="vsr-ins-type" value="Insurance from Outside" onchange="onInsuranceTypeChange()"> Insurance from Outside</label>
+        </div>
+      </div>
+      <div><label>Insurance Amount (&#8377;)</label><input id="vsr-ins-amount" type="number" step="0.01"></div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Extended Warranty (EW)</label>
+        <div class="radio-group">
+          <label><input type="radio" name="vsr-ew-type" value="Amount" onchange="onEwTypeChange()" checked> Amount</label>
+          <label><input type="radio" name="vsr-ew-type" value="No EW" onchange="onEwTypeChange()"> No EW</label>
+        </div>
+      </div>
+      <div><label>EW Amount (&#8377;)</label><input id="vsr-ew-amount" type="number" step="0.01"></div>
+    </div>
+
+    <div class="form-row" id="vsr-hpa-row">
+      <div><label>HPA (&#8377;)</label><input id="vsr-hpa-amount" type="number" step="0.01"></div>
+    </div>
+
+    <div class="form-row" id="vsr-finance-block">
+      <div><label>Financier (raw file)</label><input id="vsr-financier" placeholder="e.g. HDFC Bank, or Others"></div>
+      <div><label>Hypothecation (used if Financier = Others)</label><input id="vsr-hypothecation" disabled></div>
+      <div><label>Finance Amount (&#8377;)</label><input id="vsr-finance-amount" type="number" step="0.01"></div>
+    </div>
+
+    <button type="submit">Submit &amp; post to ledger</button>
+    <button type="button" onclick="closeVehicleSaleReviewForm()">Cancel</button>
+  </form>
+</div>

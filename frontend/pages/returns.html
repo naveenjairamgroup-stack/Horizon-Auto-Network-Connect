@@ -1,0 +1,44 @@
+<div class="card">
+  <h2>Submit vehicle / parts return</h2>
+  <form id="new-return-form">
+    <div class="form-row">
+      <div><label>Dealer code</label><input id="ret-dealer-code" required></div>
+      <div>
+        <label>Return type</label>
+        <select id="ret-type" onchange="onReturnTypeChange()">
+          <option value="Vehicle">Vehicle</option>
+          <option value="Parts">Parts</option>
+        </select>
+      </div>
+      <div><label>Invoice no.</label><input id="ret-invoice-no" required></div>
+      <div><label>Invoice date</label><input id="ret-invoice-date" type="date" required></div>
+    </div>
+
+    <div id="ret-vehicle-block">
+      <label>Frame number(s)</label>
+      <div id="ret-frame-list">
+        <div class="frame-row"><input class="ret-frame-input" placeholder="Frame no. 1"></div>
+      </div>
+      <button type="button" onclick="addFrameNumberInput()">+ Add frame number</button>
+    </div>
+
+    <div id="ret-parts-block" style="display:none;">
+      <div class="form-row"><div style="flex:3"><label>Part description</label><input id="ret-part-desc"></div></div>
+    </div>
+
+    <div class="form-row">
+      <div><label>Total amount (&#8377;)</label><input id="ret-amount" type="number" step="0.01" required></div>
+      <div style="flex:2"><label>Tax invoice copy (mandatory)</label><input id="ret-attachment" type="file" accept="image/*,.pdf" required></div>
+    </div>
+    <button type="submit">Submit for approval</button>
+  </form>
+  <p style="color:#888; font-size:12px; margin-top:8px;">Invoices older than 7 days can only be entered by Admin or Accounts.</p>
+</div>
+
+<div class="card">
+  <h2>Returns</h2>
+  <table>
+    <thead><tr><th>Dealer</th><th>Type</th><th>Invoice</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="return-table-body"></tbody>
+  </table>
+</div>

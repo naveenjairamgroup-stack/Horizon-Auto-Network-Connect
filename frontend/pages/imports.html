@@ -1,0 +1,14 @@
+<div class="card">
+  <h2>Drive Import</h2>
+  <p style="color:#888; font-size:12px;">Automatically runs daily at 12:00 and 16:00. Use this button to run it right now instead of waiting.</p>
+  <button onclick="handleImportNow()">Import Now</button>
+  <div id="import-now-result" style="margin-top:10px; font-size:13px;"></div>
+</div>
+
+<div class="card">
+  <h2>Import log</h2>
+  <table>
+    <thead><tr><th>Time</th><th>Folder</th><th>File</th><th>Processed</th><th>Skipped</th><th>Updated</th><th>Reversed</th><th>Status</th></tr></thead>
+    <tbody id="import-log-table-body"></tbody>
+  </table>
+</div>

@@ -1,0 +1,39 @@
+<div class="card">
+  <h2>Add dealer</h2>
+  <form id="new-dealer-form">
+    <div class="form-row">
+      <div><label>Dealer code</label><input id="nd-code" placeholder="e.g. NG" required></div>
+      <div style="flex:2"><label>Dealer name</label><input id="nd-name" required></div>
+      <div>
+        <label>Type</label>
+        <select id="nd-type">
+          <option value="AD">AD &mdash; Associate Dealer</option>
+          <option value="ASC">ASC &mdash; Authorised Service Centre</option>
+          <option value="FO">FO &mdash; Festival Outlet</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Region</label><input id="nd-region"></div>
+      <div><label>Credit limit (&#8377;)</label><input id="nd-limit" type="number" step="0.01"></div>
+      <div><label>Mobile</label><input id="nd-mobile"></div>
+      <div><label>Email</label><input id="nd-email" type="email"></div>
+    </div>
+    <div class="form-row">
+      <div><label>GST number</label><input id="nd-gst" placeholder="Used to match Main-Dealer-billed parts invoices"></div>
+      <div style="flex:2"><label>Vehicle Sale Alias (ASC only — exact name from "Assigned To (DSE)" in Vehicle_Sale reports)</label><input id="nd-vsalias" placeholder="e.g. NG AUTOMOBILES, BARWADIH"></div>
+    </div>
+    <div class="form-row">
+      <div style="flex:2"><label>Inventory Location Alias (ASC only — exact name from "Inventory Location" in Stock reports)</label><input id="nd-invalias" placeholder="e.g. NG AUTOMOBILES, BARWADIH"></div>
+    </div>
+    <button type="submit">Save dealer</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>All dealers</h2>
+  <table>
+    <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Region</th><th>Credit limit</th><th>Status</th><th>Vehicle Sale Alias</th><th>Inventory Location Alias</th><th></th></tr></thead>
+    <tbody id="dealer-table-body"></tbody>
+  </table>
+</div>

@@ -1,0 +1,30 @@
+<div class="card">
+  <h2>Submit payment</h2>
+  <form id="new-payment-form">
+    <div class="form-row">
+      <div><label>Dealer code</label><input id="pay-dealer-code" required></div>
+      <div>
+        <label>Mode</label>
+        <select id="pay-mode">
+          <option>Cash</option><option>NEFT</option><option>RTGS</option><option>UPI</option>
+          <option>Adjustment</option><option>Credit Note</option>
+        </select>
+      </div>
+      <div><label>Amount (&#8377;)</label><input id="pay-amount" type="number" step="0.01" required></div>
+      <div><label>Date</label><input id="pay-date" type="date" required></div>
+    </div>
+    <div class="form-row">
+      <div><label>Reference no.</label><input id="pay-reference"></div>
+      <div style="flex:2"><label>Remarks</label><input id="pay-remarks"></div>
+    </div>
+    <button type="submit">Submit for approval</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Payments</h2>
+  <table>
+    <thead><tr><th>Dealer</th><th>Mode</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="payment-table-body"></tbody>
+  </table>
+</div>

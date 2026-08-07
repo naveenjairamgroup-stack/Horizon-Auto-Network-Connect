@@ -1,71 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <base target="_top">
   <meta charset="utf-8">
-  <style>
-  * { box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
-  html, body { margin: 0; background: #f4f6f8; color: #222; }
-  #login-section { max-width: 360px; margin: 80px auto; background: #fff; padding: 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-  #login-section .brand-heading { text-align: center; margin-bottom: 22px; }
-  #login-section .brand-heading h1 { color: #c8102e; margin: 0; font-size: 26px; letter-spacing: 0.5px; }
-  #login-section .brand-heading .brand-sub { color: #888; font-size: 12px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
-  #login-section input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-  #login-section button { width: 100%; padding: 10px; background: #c8102e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
-  #login-error { color: #c8102e; min-height: 20px; font-size: 13px; }
-  .navbar { background: #c8102e; color: #fff; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; }
-  .navbar .brand { display: flex; flex-direction: column; line-height: 1.25; }
-  .navbar .brand .brand-main { font-weight: bold; font-size: 16px; }
-  .navbar .brand .brand-sub { font-size: 10px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.85; }
-  .navbar button { background: #fff; color: #c8102e; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-  .layout { display: flex; min-height: calc(100vh - 52px); }
-  .sidebar { width: 210px; background: #fff; border-right: 1px solid #ddd; padding: 16px 0; }
-  .sidebar a { display: block; padding: 10px 20px; color: #333; text-decoration: none; font-size: 14px; cursor: pointer; border-left: 3px solid transparent; }
-  .sidebar a:hover { background: #f5f5f5; }
-  .sidebar a.active { font-weight: bold; color: #c8102e; background: #fdeaec; border-left: 3px solid #c8102e; }
-  .content { flex: 1; padding: 24px; }
-  .page { display: none; }
-  table { width: 100%; border-collapse: collapse; background: #fff; margin-top: 12px; }
-  th, td { padding: 8px 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
-  th { background: #fafafa; color: #555; }
-  .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 18px; }
-  .card h2 { margin-top: 0; font-size: 17px; color: #333; }
-  .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .form-row > div { flex: 1; min-width: 160px; }
-  .kpi-grid { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; }
-  .kpi-grid > div { flex: 1 1 180px; min-width: 180px; max-width: 260px; }
-  label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
-  input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-  button[type="submit"] { background: #c8102e; color: #fff; border: none; padding: 10px 18px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; color: #fff; }
-  .badge-green { background: #2e7d32; }
-  .badge-yellow { background: #f9a825; }
-  .badge-red { background: #c62828; }
-  .kpi { font-size: 22px; font-weight: bold; word-break: break-word; overflow-wrap: break-word; line-height: 1.25; }
-  .kpi-label { font-size: 12px; color: #888; }
-  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 18px; border-radius: 4px; color: #fff; display: none; z-index: 999; max-width: 320px; }
-  .toast-success { background: #2e7d32; }
-  .toast-error { background: #c62828; }
-  .modal-overlay { position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index: 1000; }
-  .modal-box { background:#fff; border-radius:8px; max-width: 640px; width: 90%; max-height: 85vh; overflow-y:auto; padding: 20px 24px; }
-  .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; }
-  .modal-header h3 { margin:0; font-size: 16px; }
-  .modal-header button { background:none; border:none; font-size:22px; cursor:pointer; color:#888; line-height:1; }
-  .modal-box table { margin-top: 8px; }
-  .modal-total-row td { font-weight:bold; border-top: 2px solid #ddd; }
-  .link-btn { background:none; border:none; color:#c8102e; text-decoration:underline; cursor:pointer; padding:0; font-size:13px; }
-  .radio-group { display:flex; gap:14px; flex-wrap:wrap; padding-top:6px; }
-  .radio-group label { display:flex; align-items:center; gap:5px; font-size:13px; color:#333; font-weight:normal; }
-  .frame-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .frame-row input { flex: 1; }
-  .frame-remove-btn { background:#f1f1f1; border:none; color:#c62828; font-weight:bold; width:26px; height:26px; min-width:26px; border-radius:50%; cursor:pointer; font-size:14px; line-height:1; }
-  .frame-remove-btn:hover { background:#fdeaec; }
-</style>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Horizon Auto — Network Connect</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
   <div id="login-section">
-    <div class="brand-heading">
+<div class="brand-heading">
   <h1>Horizon Auto</h1>
   <div class="brand-sub">Network Connect</div>
 </div>
@@ -79,7 +22,7 @@
   </div>
 
   <div id="main-section" style="display:none;">
-    <div class="navbar">
+<div class="navbar">
   <div class="brand">
     <span class="brand-main">Horizon Auto</span>
     <span class="brand-sub">Network Connect</span>
@@ -91,10 +34,11 @@
 </div>
 
     <div class="layout">
-      <div class="sidebar" id="sidebar-links"></div>
+<div class="sidebar" id="sidebar-links"></div>
 
       <div class="content">
-        <div id="page-Dashboard_Admin" class="page"><div class="card">
+        <div id="page-Dashboard_Admin" class="page">
+<div class="card">
   <h2>Admin dashboard</h2>
   <div class="kpi-grid">
     <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
@@ -105,9 +49,16 @@
     <div><div class="kpi kpi-pending-vsr">-</div><div class="kpi-label">Pending vehicle sale reviews</div></div>
     <div><div class="kpi kpi-pending-psr">-</div><div class="kpi-label">Pending parts assignments</div></div>
   </div>
+  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
+  <table>
+    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
+    <tbody id="dashboard-dealer-summary-body"></tbody>
+  </table>
 </div>
-</div>
-        <div id="page-Dashboard_NetworkManager" class="page"><div class="card">
+
+        </div>
+        <div id="page-Dashboard_NetworkManager" class="page">
+<div class="card">
   <h2>Network Manager dashboard</h2>
   <div class="kpi-grid">
     <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
@@ -116,9 +67,16 @@
     <div><div class="kpi kpi-pending-returns">-</div><div class="kpi-label">Pending returns to approve</div></div>
     <div><div class="kpi kpi-pending-vsr">-</div><div class="kpi-label">Pending vehicle sale reviews</div></div>
   </div>
+  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
+  <table>
+    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
+    <tbody id="dashboard-dealer-summary-body"></tbody>
+  </table>
 </div>
-</div>
-        <div id="page-Dashboard_Accounts" class="page"><div class="card">
+
+        </div>
+        <div id="page-Dashboard_Accounts" class="page">
+<div class="card">
   <h2>Accounts dashboard</h2>
   <div class="kpi-grid">
     <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
@@ -126,14 +84,23 @@
     <div><div class="kpi kpi-over-limit">-</div><div class="kpi-label">Dealers over limit</div></div>
     <div><div class="kpi kpi-pending-payments">-</div><div class="kpi-label">Pending payments to approve</div></div>
   </div>
+  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
+  <table>
+    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
+    <tbody id="dashboard-dealer-summary-body"></tbody>
+  </table>
 </div>
-</div>
-        <div id="page-Dashboard_Dealer" class="page"><div class="card">
+
+        </div>
+        <div id="page-Dashboard_Dealer" class="page">
+<div class="card">
   <h2>Welcome</h2>
   <p>Open the Ledger tab to see your outstanding balance, credit limit status, and full transaction history.</p>
 </div>
-</div>
-        <div id="page-DealerMaster" class="page"><div class="card">
+
+        </div>
+        <div id="page-DealerMaster" class="page">
+<div class="card">
   <h2>Add dealer</h2>
   <form id="new-dealer-form">
     <div class="form-row">
@@ -172,8 +139,10 @@
     <tbody id="dealer-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-UserMaster" class="page"><div class="card">
+
+        </div>
+        <div id="page-UserMaster" class="page">
+<div class="card">
   <h2>Create user</h2>
   <form id="new-user-form">
     <div class="form-row">
@@ -204,8 +173,10 @@
     <tbody id="user-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-Ledger" class="page"><div class="card">
+
+        </div>
+        <div id="page-Ledger" class="page">
+<div class="card">
   <h2>Ledger</h2>
   <div class="form-row" id="ledger-dealer-picker">
     <div>
@@ -273,8 +244,10 @@
     <button type="submit">Set opening balance</button>
   </form>
 </div>
-</div>
-        <div id="page-Payments" class="page"><div class="card">
+
+        </div>
+        <div id="page-Payments" class="page">
+<div class="card">
   <h2>Submit payment</h2>
   <form id="new-payment-form">
     <div class="form-row">
@@ -304,8 +277,10 @@
     <tbody id="payment-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-Returns" class="page"><div class="card">
+
+        </div>
+        <div id="page-Returns" class="page">
+<div class="card">
   <h2>Submit vehicle / parts return</h2>
   <form id="new-return-form">
     <div class="form-row">
@@ -349,8 +324,10 @@
     <tbody id="return-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-Commission" class="page"><div class="card">
+
+        </div>
+        <div id="page-Commission" class="page">
+<div class="card">
   <h2>Add commission rule</h2>
   <form id="new-commission-rule-form">
     <div class="form-row">
@@ -387,8 +364,10 @@
     <tbody id="commission-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-AuditLog" class="page"><div class="card">
+
+        </div>
+        <div id="page-AuditLog" class="page">
+<div class="card">
   <h2>Audit log</h2>
   <p style="color:#888; font-size:12px;">Every create/update in the system, most recent first (last 200 shown).</p>
   <table>
@@ -396,8 +375,10 @@
     <tbody id="audit-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-VehicleSaleReview" class="page"><div class="card">
+
+        </div>
+        <div id="page-VehicleSaleReview" class="page">
+<div class="card">
   <h2>ASC Vehicle Sale — Review Queue</h2>
   <p style="color:#888; font-size:12px;">Har invoice ke liye Registration/Insurance/EW/HPA bharkar submit karo — tabhi yeh Ledger mein post hoga. Submit karne ke 60 minute tak khud edit kar sakte ho.</p>
   <table>
@@ -464,8 +445,10 @@
     <button type="button" onclick="closeVehicleSaleReviewForm()">Cancel</button>
   </form>
 </div>
-</div>
-        <div id="page-PartsReview" class="page"><div class="card">
+
+        </div>
+        <div id="page-PartsReview" class="page">
+<div class="card">
   <h2>Parts Sale — Review Queue</h2>
   <p style="color:#888; font-size:12px;">Yeh invoices Main Dealer GST se match nahi hui, lekin naam se ek dealer suggest hua hai. Confirm ya kisi aur dealer ko assign karo.</p>
   <table>
@@ -473,8 +456,10 @@
     <tbody id="psr-table-body"></tbody>
   </table>
 </div>
-</div>
-        <div id="page-Imports" class="page"><div class="card">
+
+        </div>
+        <div id="page-Imports" class="page">
+<div class="card">
   <h2>Drive Import</h2>
   <p style="color:#888; font-size:12px;">Automatically runs daily at 12:00 and 16:00. Use this button to run it right now instead of waiting.</p>
   <button onclick="handleImportNow()">Import Now</button>
@@ -488,894 +473,14 @@
     <tbody id="import-log-table-body"></tbody>
   </table>
 </div>
-</div>
+
+        </div>
       </div>
     </div>
   </div>
 
   <div id="toast" class="toast"></div>
 
-  <script>
-  var session = null;
-  const API_URL = "https://script.google.com/macros/s/AKfycbzv7fSgbB87N9TbndU6HI08JDfkj59gZxgM08SOVsmyS66pn_3O4FUeySGhr4LVeds/exec";
-
-  /** Promise wrapper around google.script.run so every backend call can use .then()/.catch(). */
-  /**
-   * Safely turns a JS value into source text that can sit inside an
-   * onclick="..." (double-quoted) HTML attribute built via string
-   * concatenation. Plain JSON.stringify() is NOT safe here: its output is
-   * itself wrapped in double quotes, which prematurely closes the outer
-   * onclick="..." attribute the moment the browser's HTML parser hits them —
-   * the handler silently becomes garbage and nothing happens on click.
-   * Escaping the embedded quotes as HTML entities fixes this for any value,
-   * including ones containing single or double quotes.
-   */
-  function jsArg_(value) {
-    return JSON.stringify(value).replace(/"/g, '&quot;');
-  }
-
-  function api(action, ...args) {
-
-  const form = new URLSearchParams();
-  form.append("data", JSON.stringify({
-    action: action,
-    args: args
-  }));
-
-  return fetch(API_URL, {
-    method: "POST",
-    body: form
-  })
-  .then(res => res.json());
-
-}
-
-  function showPage(pageId) {
-    document.querySelectorAll('.page').forEach(function (el) { el.style.display = 'none'; });
-    var el = document.getElementById('page-' + pageId);
-    if (el) el.style.display = 'block';
-  }
-
-  function dashboardPageForRole(role) {
-    if (role === 'Admin') return 'Dashboard_Admin';
-    if (role === 'Network Manager') return 'Dashboard_NetworkManager';
-    if (role === 'Accounts') return 'Dashboard_Accounts';
-    return 'Dashboard_Dealer';
-  }
-
-  // ---------------------------------------------------------------- Login ---
-  function handleLogin(event) {
-    event.preventDefault();
-    var username = document.getElementById('login-username').value;
-    var password = document.getElementById('login-password').value;
-    var errorEl = document.getElementById('login-error');
-    errorEl.textContent = '';
-    api('login', username, password).then(onLoginSuccess).catch(function (err) {
-      errorEl.textContent = err.message || String(err);
-    });
-  }
-
-  function onLoginSuccess(result) {
-    session = result; // {token, username, role, dealerCode, fullName}
-    document.getElementById('login-section').style.display = 'none';
-    document.getElementById('main-section').style.display = 'block';
-    document.getElementById('navbar-username').textContent = session.fullName + ' (' + session.role + ')';
-    buildSidebar(session.role);
-    showPage(dashboardPageForRole(session.role));
-
-    var canEditLedger = (session.role === 'Admin' || session.role === 'Accounts');
-    document.getElementById('ledger-entry-card').style.display = canEditLedger ? 'block' : 'none';
-    document.getElementById('opening-balance-card').style.display = canEditLedger ? 'block' : 'none';
-    document.getElementById('ledger-dealer-picker').style.display = (session.role === 'Dealer') ? 'none' : 'flex';
-
-    loadVoucherHeadOptions();
-    loadDashboardSummary();
-    if (session.role === 'Dealer') {
-      loadLedger(session.dealerCode);
-    }
-  }
-
-  function handleLogout() {
-    if (!session) return;
-    api('logout', session.token).finally(function () {
-      session = null;
-      document.getElementById('main-section').style.display = 'none';
-      document.getElementById('login-section').style.display = 'block';
-      document.getElementById('login-username').value = '';
-      document.getElementById('login-password').value = '';
-    });
-  }
-
-  function buildSidebar(role) {
-    var links = {
-      'Admin':            ['Dashboard', 'DealerMaster', 'UserMaster', 'Ledger', 'Payments', 'Returns', 'Commission', 'VehicleSaleReview', 'PartsReview', 'Imports', 'AuditLog'],
-      'Network Manager':  ['Dashboard', 'DealerMaster', 'Ledger', 'Payments', 'Returns', 'VehicleSaleReview', 'Imports'],
-      'Accounts':         ['Dashboard', 'DealerMaster', 'Ledger', 'Payments', 'Returns', 'Commission', 'PartsReview', 'Imports'],
-      'Dealer':           ['Dashboard', 'Ledger', 'Payments']
-    };
-    var labels = {
-      Dashboard: 'Dashboard', DealerMaster: 'Dealer master', UserMaster: 'User master',
-      Ledger: 'Ledger', Payments: 'Payments', Returns: 'Returns', Commission: 'Commission', AuditLog: 'Audit log',
-      VehicleSaleReview: 'Vehicle sale review', PartsReview: 'Parts review', Imports: 'Imports'
-    };
-    var container = document.getElementById('sidebar-links');
-    container.innerHTML = '';
-    (links[role] || []).forEach(function (name) {
-      var a = document.createElement('a');
-      a.href = '#';
-      a.textContent = labels[name] || name;
-      a.dataset.page = name;
-      a.onclick = function () {
-        document.querySelectorAll('.sidebar a').forEach(function (el) { el.classList.remove('active'); });
-        a.classList.add('active');
-        var target = name === 'Dashboard' ? dashboardPageForRole(role) : name;
-        showPage(target);
-        if (name === 'Dashboard') loadDashboardSummary();
-        if (name === 'DealerMaster') loadDealers();
-        if (name === 'UserMaster') loadUsers();
-        if (name === 'Ledger') {
-          if (role === 'Dealer') loadLedger(session.dealerCode);
-          else loadDealerDropdowns();
-        }
-        if (name === 'Payments') loadPayments();
-        if (name === 'Returns') loadReturns();
-        if (name === 'Commission') loadCommissionRules();
-        if (name === 'AuditLog') loadAuditLog();
-        if (name === 'VehicleSaleReview') loadVehicleSaleReviews();
-        if (name === 'PartsReview') loadPartsSaleReviewQueue();
-        if (name === 'Imports') loadImportLog();
-        return false;
-      };
-      container.appendChild(a);
-    });
-    // Dashboard is the default landing page after login — mark it active immediately.
-    var firstLink = container.querySelector('a[data-page="Dashboard"]');
-    if (firstLink) firstLink.classList.add('active');
-  }
-
-  // --------------------------------------------------------- Dealer Master ---
-  function loadDealers() {
-    api('listDealers', session.token).then(function (dealers) {
-      var tbody = document.getElementById('dealer-table-body');
-      tbody.innerHTML = '';
-      (dealers || []).forEach(function (d) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + d['Dealer Code'] + '</td><td>' + d['Dealer Name'] + '</td><td>' + d.Type + '</td>' +
-          '<td>' + (d.Region || '') + '</td><td>' + formatMoney_(d['Credit Limit']) + '</td><td>' + d.Status + '</td>' +
-          '<td>' + (d['Vehicle Sale Alias'] || '<span style="color:#bbb;">not set</span>') + '</td>' +
-          '<td>' + (d['Inventory Location Alias'] || '<span style="color:#bbb;">not set</span>') + '</td>' +
-          '<td><button class="link-btn" onclick="handleEditVehicleSaleAlias(' + jsArg_(d['Dealer Code']) + ', ' + jsArg_(d['Vehicle Sale Alias'] || '') + ')">Edit VS alias</button> ' +
-          '<button class="link-btn" onclick="handleEditInventoryAlias(' + jsArg_(d['Dealer Code']) + ', ' + jsArg_(d['Inventory Location Alias'] || '') + ')">Edit Inv alias</button></td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleEditVehicleSaleAlias(dealerCode, current) {
-    var value = window.prompt('Vehicle Sale Alias for ' + dealerCode + ' (exact "Assigned To (DSE) Name" from Vehicle_Sale reports):', current || '');
-    if (value === null) return;
-    api('updateDealer', session.token, dealerCode, { 'Vehicle Sale Alias': value }).then(function () {
-      showToast_(null, 'Updated.');
-      loadDealers();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleEditInventoryAlias(dealerCode, current) {
-    var value = window.prompt('Inventory Location Alias for ' + dealerCode + ' (exact "Inventory Location" from Stock reports):', current || '');
-    if (value === null) return;
-    api('updateDealer', session.token, dealerCode, { 'Inventory Location Alias': value }).then(function () {
-      showToast_(null, 'Updated.');
-      loadDealers();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleCreateDealer(event) {
-    event.preventDefault();
-    var dealer = {
-      'Dealer Code':   document.getElementById('nd-code').value,
-      'Dealer Name':   document.getElementById('nd-name').value,
-      'Type':          document.getElementById('nd-type').value,
-      'Region':        document.getElementById('nd-region').value,
-      'Credit Limit':  document.getElementById('nd-limit').value,
-      'Mobile':        document.getElementById('nd-mobile').value,
-      'Email':         document.getElementById('nd-email').value,
-      'GST':           document.getElementById('nd-gst').value,
-      'Vehicle Sale Alias': document.getElementById('nd-vsalias').value,
-      'Inventory Location Alias': document.getElementById('nd-invalias').value
-    };
-    api('createDealer', session.token, dealer).then(function () {
-      showToast_(null, 'Dealer created.');
-      document.getElementById('new-dealer-form').reset();
-      loadDealers();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ---------------------------------------------------------------- Ledger ---
-  function loadDealerDropdowns() {
-    api('listDealers', session.token).then(function (dealers) {
-      var select = document.getElementById('ledger-dealer-select');
-      select.innerHTML = '';
-      (dealers || []).forEach(function (d) {
-        var opt = document.createElement('option');
-        opt.value = d['Dealer Code'];
-        opt.textContent = d['Dealer Code'] + ' \u2014 ' + d['Dealer Name'];
-        select.appendChild(opt);
-      });
-      if (dealers && dealers.length) loadLedger(dealers[0]['Dealer Code']);
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function onLedgerDealerChange() {
-    loadLedger(document.getElementById('ledger-dealer-select').value);
-  }
-
-  function loadLedger(dealerCode) {
-    if (!dealerCode) return;
-    if (document.getElementById('entry-dealer-code')) document.getElementById('entry-dealer-code').value = dealerCode;
-    if (document.getElementById('ob-dealer-code')) document.getElementById('ob-dealer-code').value = dealerCode;
-
-    api('getLedger', session.token, dealerCode).then(function (rows) {
-      var tbody = document.getElementById('ledger-table-body');
-      tbody.innerHTML = '';
-      var invoiceDetailHeads = ['Vehicle Sale', 'Parts Sale', 'Finance Company Advance'];
-      (rows || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        var viewBtn = '';
-        if (r.Head === 'Total Stock') {
-          viewBtn = '<button class="link-btn" onclick="openInventoryDetailModal(' + jsArg_(dealerCode) + ')">View</button>';
-        } else if (invoiceDetailHeads.indexOf(r.Head) !== -1 && r['Invoice No']) {
-          viewBtn = '<button class="link-btn" onclick="openDetailModal(' + jsArg_(r['Invoice No']) + ',' + jsArg_(dealerCode) + ',' + jsArg_(r.Head) + ')">View</button>';
-        }
-        tr.innerHTML = '<td>' + formatDateDisplay_(r['Invoice Date'] || r.Date) + '</td><td>' + r.Head + '</td><td>' + (r['Invoice No'] || '') + '</td>' +
-          '<td>' + (r.Remarks || '') + '</td>' +
-          '<td>' + (Number(r.Debit) ? formatMoney_(r.Debit) : '') + '</td>' +
-          '<td>' + (Number(r.Credit) ? formatMoney_(r.Credit) : '') + '</td>' +
-          '<td>' + formatMoney_(r['Running Balance']) + '</td>' +
-          '<td>' + viewBtn + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-
-    api('getCreditStatus', session.token, dealerCode).then(function (status) {
-      var el = document.getElementById('ledger-outstanding');
-      el.textContent = formatMoney_(status.outstanding);
-      var badge = document.getElementById('ledger-credit-badge');
-      badge.textContent = status.status + ' \u00b7 ' + status.usedPercent + '% of limit used';
-      badge.className = 'badge badge-' + status.status.toLowerCase();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function loadVoucherHeadOptions() {
-    api('listVoucherHeads', session.token).then(function (heads) {
-      var select = document.getElementById('entry-head');
-      if (!select) return;
-      select.innerHTML = '';
-      (heads || []).forEach(function (h) {
-        var opt = document.createElement('option');
-        opt.value = h['Head Name'];
-        opt.textContent = h['Head Name'] + ' (' + h.Effect + ')';
-        select.appendChild(opt);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleAddLedgerEntry(event) {
-    event.preventDefault();
-    var entry = {
-      'Date':        document.getElementById('entry-date').value,
-      'Head':        document.getElementById('entry-head').value,
-      'Dealer Code': document.getElementById('entry-dealer-code').value,
-      'Invoice No':  document.getElementById('entry-invoice').value,
-      'Amount':      document.getElementById('entry-amount').value,
-      'Remarks':     document.getElementById('entry-remarks').value
-    };
-    api('addLedgerEntry', session.token, entry).then(function () {
-      showToast_(null, 'Entry added.');
-      document.getElementById('new-entry-form').reset();
-      loadLedger(entry['Dealer Code']);
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleSetOpeningBalance(event) {
-    event.preventDefault();
-    var dealerCode = document.getElementById('ob-dealer-code').value;
-    var fy     = document.getElementById('ob-fy').value;
-    var amount = document.getElementById('ob-amount').value;
-    var type   = document.getElementById('ob-type').value;
-    var effectiveDate = document.getElementById('ob-effective-date').value;
-    api('setOpeningBalance', session.token, dealerCode, fy, amount, type, effectiveDate).then(function () {
-      showToast_(null, 'Opening balance set.');
-      document.getElementById('opening-balance-form').reset();
-      loadLedger(dealerCode);
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ---------------------------------------------------------------- Utils ---
-  function formatMoney_(n) {
-    n = Number(n) || 0;
-    return '\u20b9' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  /** Always shows dd-mm-yyyy, regardless of what format the value arrives in (ISO string, Date, etc). */
-  function formatDateDisplay_(value) {
-    if (!value) return '';
-    var d = new Date(value);
-    if (isNaN(d.getTime())) return String(value);
-    var dd = String(d.getDate()).padStart(2, '0');
-    var mm = String(d.getMonth() + 1).padStart(2, '0');
-    var yyyy = d.getFullYear();
-    return dd + '-' + mm + '-' + yyyy;
-  }
-
-  function showToast_(err, successMsg) {
-    var el = document.getElementById('toast');
-    el.textContent = err ? (err.message || String(err)) : successMsg;
-    el.className = 'toast ' + (err ? 'toast-error' : 'toast-success');
-    el.style.display = 'block';
-    setTimeout(function () { el.style.display = 'none'; }, 3500);
-  }
-
-  // ------------------------------------------------------------- Dashboard ---
-  function loadDashboardSummary() {
-    var pageId = dashboardPageForRole(session.role);
-    var container = document.getElementById('page-' + pageId);
-    if (!container) return;
-    api('getDashboardSummary', session.token).then(function (s) {
-      setKpi_(container, 'total-dealers', s.totalDealers);
-      setKpi_(container, 'total-outstanding', formatMoney_(s.totalOutstanding));
-      setKpi_(container, 'over-limit', s.dealersOverLimit);
-      setKpi_(container, 'pending-payments', s.pendingPayments);
-      setKpi_(container, 'pending-returns', s.pendingReturns);
-      setKpi_(container, 'pending-vsr', s.pendingVehicleSaleReviews);
-      setKpi_(container, 'pending-psr', s.pendingPartsSaleReviews);
-    }).catch(function (err) { showToast_(err); });
-  }
-  function setKpi_(container, key, value) {
-    var el = container.querySelector('.kpi-' + key);
-    if (el) el.textContent = value;
-  }
-
-  function statusBadge_(status) {
-    var greenSet = ['Approved', 'Submitted', 'Assigned'];
-    var redSet = ['Rejected', 'Cancelled'];
-    var cls = greenSet.indexOf(status) !== -1 ? 'badge-green' : (redSet.indexOf(status) !== -1 ? 'badge-red' : 'badge-yellow');
-    return '<span class="badge ' + cls + '">' + status + '</span>';
-  }
-
-  // -------------------------------------------------------------- Payments ---
-  function loadPayments() {
-    api('listPayments', session.token).then(function (rows) {
-      var tbody = document.getElementById('payment-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (p) {
-        var tr = document.createElement('tr');
-        var actionHtml = '';
-        if (p['Approval Status'] === 'Pending' && (session.role === 'Accounts' || session.role === 'Admin')) {
-          actionHtml = '<button onclick="handleApprovePayment(\'' + p['Payment ID'] + '\')">Approve</button> ' +
-                       '<button onclick="handleRejectPayment(\'' + p['Payment ID'] + '\')">Reject</button>';
-        }
-        tr.innerHTML = '<td>' + p['Dealer Code'] + '</td><td>' + p.Mode + '</td><td>' + formatMoney_(p.Amount) + '</td>' +
-          '<td>' + p.Date + '</td><td>' + statusBadge_(p['Approval Status']) + '</td><td>' + actionHtml + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleSubmitPayment(event) {
-    event.preventDefault();
-    var payment = {
-      'Dealer Code':   document.getElementById('pay-dealer-code').value,
-      'Mode':          document.getElementById('pay-mode').value,
-      'Amount':        document.getElementById('pay-amount').value,
-      'Date':          document.getElementById('pay-date').value,
-      'Reference No':  document.getElementById('pay-reference').value,
-      'Remarks':       document.getElementById('pay-remarks').value
-    };
-    api('submitPayment', session.token, payment).then(function () {
-      showToast_(null, 'Payment submitted for approval.');
-      document.getElementById('new-payment-form').reset();
-      loadPayments();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleApprovePayment(id) {
-    api('approvePayment', session.token, id).then(function () {
-      showToast_(null, 'Payment approved and posted to ledger.');
-      loadPayments();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleRejectPayment(id) {
-    var reason = window.prompt('Reason for rejection (optional):') || '';
-    api('rejectPayment', session.token, id, reason).then(function () {
-      showToast_(null, 'Payment rejected.');
-      loadPayments();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ---------------------------------------------------------------- Returns --
-  var frameInputCount = 1;
-
-  function onReturnTypeChange() {
-    var type = document.getElementById('ret-type').value;
-    document.getElementById('ret-vehicle-block').style.display = type === 'Vehicle' ? 'block' : 'none';
-    document.getElementById('ret-parts-block').style.display = type === 'Parts' ? 'block' : 'none';
-  }
-
-  function addFrameNumberInput() {
-    frameInputCount++;
-    var div = document.createElement('div');
-    div.className = 'frame-row';
-    div.innerHTML = '<input class="ret-frame-input" placeholder="Frame no. ' + frameInputCount + '">' +
-      '<button type="button" class="frame-remove-btn" title="Remove" onclick="removeFrameNumberInput(this)">&times;</button>';
-    document.getElementById('ret-frame-list').appendChild(div);
-  }
-
-  function removeFrameNumberInput(button) {
-    button.closest('.frame-row').remove();
-  }
-
-  function readFileAsBase64_(file) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function () { resolve(reader.result.split(',')[1]); };
-      reader.onerror = function () { reject(new Error('Could not read the selected file.')); };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function handleSubmitReturn(event) {
-    event.preventDefault();
-    var fileInput = document.getElementById('ret-attachment');
-    if (!fileInput.files.length) { showToast_(new Error('Tax invoice copy is mandatory.')); return; }
-    var file = fileInput.files[0];
-
-    readFileAsBase64_(file).then(function (base64) {
-      return api('uploadAttachment', session.token, base64, file.name, file.type);
-    }).then(function (uploaded) {
-      var type = document.getElementById('ret-type').value;
-      var frameNumbers = Array.prototype.slice.call(document.querySelectorAll('.ret-frame-input'))
-        .map(function (i) { return i.value.trim(); }).filter(Boolean).join(', ');
-      var ret = {
-        'Dealer Code':      document.getElementById('ret-dealer-code').value,
-        'Return Type':      type,
-        'Invoice No':       document.getElementById('ret-invoice-no').value,
-        'Invoice Date':     document.getElementById('ret-invoice-date').value,
-        'Frame Numbers':    type === 'Vehicle' ? frameNumbers : '',
-        'Part Description': type === 'Parts' ? document.getElementById('ret-part-desc').value : '',
-        'Total Amount':     document.getElementById('ret-amount').value,
-        'Attachment Link':  uploaded.url
-      };
-      return api('submitReturn', session.token, ret);
-    }).then(function () {
-      showToast_(null, 'Return submitted for approval.');
-      document.getElementById('new-return-form').reset();
-      loadReturns();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function loadReturns() {
-    api('listReturns', session.token).then(function (rows) {
-      var tbody = document.getElementById('return-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        var actionHtml = '';
-        if (r['Approval Status'] === 'Pending' && (session.role === 'Network Manager' || session.role === 'Admin')) {
-          actionHtml = '<button onclick="handleApproveReturn(\'' + r['Return ID'] + '\')">Approve</button> ' +
-                       '<button onclick="handleRejectReturn(\'' + r['Return ID'] + '\')">Reject</button>';
-        }
-        var lateTag = String(r['Late Entry']) === 'true' ? ' <span class="badge badge-yellow">Late entry</span>' : '';
-        tr.innerHTML = '<td>' + r['Dealer Code'] + '</td><td>' + r['Return Type'] + '</td><td>' + r['Invoice No'] + lateTag + '</td>' +
-          '<td>' + formatMoney_(r['Total Amount']) + '</td><td>' + statusBadge_(r['Approval Status']) + '</td><td>' + actionHtml + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleApproveReturn(id) {
-    api('approveReturn', session.token, id).then(function () {
-      showToast_(null, 'Return approved and posted to ledger.');
-      loadReturns();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleRejectReturn(id) {
-    var reason = window.prompt('Reason for rejection (optional):') || '';
-    api('rejectReturn', session.token, id, reason).then(function () {
-      showToast_(null, 'Return rejected.');
-      loadReturns();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ------------------------------------------------------------- Commission --
-  function loadCommissionRules() {
-    api('listCommissionRules', session.token).catch(function (err) { showToast_(err); });
-  }
-
-  function handleAddCommissionRule(event) {
-    event.preventDefault();
-    var rule = {
-      'Vehicle Model':    document.getElementById('cr-model').value,
-      'Commission Type':  document.getElementById('cr-type').value,
-      'Rate':             document.getElementById('cr-rate').value,
-      'Effective Date':   document.getElementById('cr-effective').value
-    };
-    api('addCommissionRule', session.token, rule).then(function () {
-      showToast_(null, 'Commission rule added.');
-      document.getElementById('new-commission-rule-form').reset();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleCalculateCommission(event) {
-    event.preventDefault();
-    var dealerCode = document.getElementById('cc-dealer-code').value;
-    var month = document.getElementById('cc-month').value;
-    api('calculateCommission', session.token, dealerCode, month).then(function (result) {
-      showToast_(null, 'Commission calculated: ' + formatMoney_(result.amount) + ' for ' + result.retailCount + ' retail(s).');
-      document.getElementById('calc-commission-form').reset();
-      loadCommissionEntries(dealerCode);
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function loadCommissionEntries(dealerCode) {
-    api('listCommissionEntries', session.token, dealerCode).then(function (rows) {
-      var tbody = document.getElementById('commission-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (c) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + c['Dealer Code'] + '</td><td>' + c.Month + '</td><td>' + c['Retail Count'] + '</td><td>' + formatMoney_(c.Amount) + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ------------------------------------------------------------ User master --
-  function onUserRoleChange() {
-    var role = document.getElementById('nu-role').value;
-    document.getElementById('nu-dealer-code-block').style.display = role === 'Dealer' ? 'block' : 'none';
-  }
-
-  function loadUsers() {
-    api('listUsers', session.token).then(function (users) {
-      var tbody = document.getElementById('user-table-body');
-      tbody.innerHTML = '';
-      (users || []).forEach(function (u) {
-        var tr = document.createElement('tr');
-        var isActive = String(u.Active) === 'true';
-        var toggleLabel = isActive ? 'Deactivate' : 'Activate';
-        tr.innerHTML = '<td>' + u.Username + '</td><td>' + u['Full Name'] + '</td><td>' + u.Role + '</td>' +
-          '<td>' + (u['Dealer Code'] || '') + '</td><td>' + (isActive ? 'Yes' : 'No') + '</td>' +
-          '<td><button onclick="handleToggleUser(\'' + u.Username + '\', ' + (!isActive) + ')">' + toggleLabel + '</button> ' +
-          '<button onclick="handleResetPassword(\'' + u.Username + '\')">Reset password</button></td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleResetPassword(username) {
-    var custom = window.prompt('Custom temporary password de sakte ho (blank chhodo to system khud generate kar dega):', '');
-    if (custom === null) return; // cancelled
-    api('resetPassword', session.token, username, custom || '').then(function (result) {
-      window.alert(
-        'Password reset ho gaya.\n\n' +
-        'Username: ' + result.username + '\n' +
-        'Naya password: ' + result.newPassword + '\n\n' +
-        'Ise abhi note/copy kar lo aur user ko bata do — yeh dobara kahin nahi dikhega.'
-      );
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleCreateUser(event) {
-    event.preventDefault();
-    var user = {
-      'Username':     document.getElementById('nu-username').value,
-      'Full Name':    document.getElementById('nu-fullname').value,
-      'Role':         document.getElementById('nu-role').value,
-      'Dealer Code':  document.getElementById('nu-dealer-code').value
-    };
-    var tempPassword = document.getElementById('nu-temp-password').value || 'Welcome@123';
-    api('createUser', session.token, user, tempPassword).then(function () {
-      showToast_(null, 'User created. Temporary password: ' + tempPassword);
-      document.getElementById('new-user-form').reset();
-      loadUsers();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleToggleUser(username, active) {
-    api('setUserActive', session.token, username, active).then(function () {
-      showToast_(null, 'Updated.');
-      loadUsers();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ------------------------------------------------------------- Audit log ---
-  function loadAuditLog() {
-    api('getAuditLog', session.token).then(function (rows) {
-      var tbody = document.getElementById('audit-table-body');
-      tbody.innerHTML = '';
-      (rows || []).slice(0, 200).forEach(function (r) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + r.Timestamp + '</td><td>' + r.User + '</td><td>' + r.Action + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ---------------------------------------------------------- Detail modal --
-  function openDetailModal(invoiceNo, dealerCode, head) {
-    api('getInvoiceDetail', session.token, invoiceNo, dealerCode, head).then(function (detail) {
-      document.getElementById('detail-modal-title').textContent = 'Invoice ' + invoiceNo;
-      var body = document.getElementById('detail-modal-body');
-      if (detail.type === 'vehicle') body.innerHTML = renderVehicleDetail_(detail);
-      else if (detail.type === 'parts') body.innerHTML = renderPartsDetail_(detail);
-      else body.innerHTML = '<p style="color:#888;">No extra detail stored for this entry.</p>';
-      document.getElementById('detail-modal-overlay').style.display = 'flex';
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function closeDetailModal() {
-    document.getElementById('detail-modal-overlay').style.display = 'none';
-  }
-
-  function renderVehicleDetail_(detail) {
-    var html = '';
-    var review = detail.review;
-    if (review) {
-      var extras = (Number(review['Registration Amount']) || 0) + (Number(review['Insurance Amount']) || 0) +
-                   (Number(review['EW Amount']) || 0) + (Number(review['HPA Amount']) || 0);
-      var totalDebit = (Number(review['Total Invoice Amount']) || 0) + extras;
-      html += '<table><tbody>';
-      html += '<tr><td>Customer</td><td>' + (review['Customer Name'] || '') + '</td></tr>';
-      html += '<tr><td>Purchase Type</td><td>' + (review['Purchase Type'] || '') + '</td></tr>';
-      html += '<tr><td>Total Invoice Amount (raw)</td><td>' + formatMoney_(review['Total Invoice Amount']) + '</td></tr>';
-      if (review['Registration Type']) html += '<tr><td>Registration (' + review['Registration Type'] + ')</td><td>' + formatMoney_(review['Registration Amount']) + '</td></tr>';
-      if (review['Insurance Type']) html += '<tr><td>Insurance' + (review['Insurance Type'] === 'Insurance from Outside' ? ' (from outside)' : '') + '</td><td>' + formatMoney_(review['Insurance Amount']) + '</td></tr>';
-      if (review['EW Type']) html += '<tr><td>Extended Warranty' + (review['EW Type'] === 'No EW' ? ' (none)' : '') + '</td><td>' + formatMoney_(review['EW Amount']) + '</td></tr>';
-      if (Number(review['HPA Amount'])) html += '<tr><td>HPA</td><td>' + formatMoney_(review['HPA Amount']) + '</td></tr>';
-      html += '<tr class="modal-total-row"><td>Total (Debit)</td><td>' + formatMoney_(totalDebit) + '</td></tr>';
-      html += '</tbody></table>';
-      if (String(review['Purchase Type']).toLowerCase() === 'finance') {
-        var financierShown = String(review.Financier).toLowerCase() === 'others' ? review.Hypothecation : review.Financier;
-        html += '<h4 style="margin-top:14px;">Finance</h4><table><tbody>';
-        html += '<tr><td>Financier</td><td>' + (financierShown || '') + '</td></tr>';
-        html += '<tr><td>Finance Amount (Credit)</td><td>' + formatMoney_(review['Finance Amount']) + '</td></tr>';
-        html += '</tbody></table>';
-      }
-    }
-    html += '<h4 style="margin-top:14px;">Frame(s)</h4>';
-    html += '<table><thead><tr><th>Frame No.</th><th>Model</th><th>Variant</th><th>Color</th><th>Taxable value</th><th>Tax</th><th>Amount</th></tr></thead><tbody>';
-    var total = 0;
-    (detail.frames || []).forEach(function (f) {
-      total += Number(f['Frame Total Amount'] || 0);
-      html += '<tr><td>' + f['Frame No'] + '</td><td>' + f['Model Name'] + '</td><td>' + f['Model Variant'] + '</td><td>' + f.Color + '</td>' +
-        '<td>' + formatMoney_(f['Taxable Value']) + '</td><td>' + formatMoney_(f['Tax Amount']) + '</td><td>' + formatMoney_(f['Frame Total Amount']) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    if (!review) html += '<p style="text-align:right; font-weight:bold; margin-top:6px;">Total: ' + formatMoney_(total) + '</p>';
-    return html;
-  }
-
-  function renderPartsDetail_(detail) {
-    var lines = detail.lines || [];
-    var first = lines[0] || {};
-    var html = '<table><tbody>';
-    html += '<tr><td>Order Type</td><td>' + (first['Order Type'] || '') + '</td></tr>';
-    html += '<tr><td>Customer</td><td>' + (first['Customer Name'] || '') + '</td></tr>';
-    html += '</tbody></table>';
-    html += '<h4 style="margin-top:14px;">Line items</h4>';
-    html += '<table><thead><tr><th>Part/Labour</th><th>Part No.</th><th>HSN</th><th>Qty</th><th>Taxable</th><th>Tax</th><th>Amount</th></tr></thead><tbody>';
-    var total = 0;
-    lines.forEach(function (l) {
-      total += Number(l['Final Amount'] || 0);
-      html += '<tr><td>' + l['Part Description'] + '</td><td>' + l['Part Number'] + '</td><td>' + l['HSN Code'] + '</td><td>' + l.Qty + '</td>' +
-        '<td>' + formatMoney_(l['Taxable Amount']) + '</td><td>' + formatMoney_(l['Total Tax']) + '</td><td>' + formatMoney_(l['Final Amount']) + '</td></tr>';
-    });
-    html += '</tbody><tfoot><tr class="modal-total-row"><td colspan="6">Total</td><td>' + formatMoney_(total) + '</td></tr></tfoot></table>';
-    return html;
-  }
-
-  // -------------------------------------------------------- Inventory value -
-  function openInventoryDetailModal(dealerCode) {
-    api('getInventoryDetail', session.token, dealerCode).then(function (rows) {
-      document.getElementById('detail-modal-title').textContent = 'Inventory detail';
-      document.getElementById('detail-modal-body').innerHTML = renderInventoryDetail_(rows);
-      document.getElementById('detail-modal-overlay').style.display = 'flex';
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function renderInventoryDetail_(rows) {
-    var html = '<table><thead><tr><th>Model Variant</th><th>Color</th><th>Frame No.</th><th>Ex-Showroom Value</th></tr></thead><tbody>';
-    var total = 0;
-    (rows || []).forEach(function (r) {
-      total += Number(r['Ex-Showroom Value'] || 0);
-      html += '<tr><td>' + r['Model Variant'] + '</td><td>' + (r.Color || '') + '</td><td>' + (r['Frame No'] || '') + '</td><td>' + formatMoney_(r['Ex-Showroom Value']) + '</td></tr>';
-    });
-    html += '</tbody><tfoot><tr class="modal-total-row"><td colspan="3">Total</td><td>' + formatMoney_(total) + '</td></tr></tfoot></table>';
-    return html;
-  }
-
-  // ------------------------------------------------- Vehicle Sale Review ----
-  var vsrCurrentQueueId = null;
-
-  function loadVehicleSaleReviews() {
-    api('listVehicleSaleReviews', session.token).then(function (rows) {
-      var tbody = document.getElementById('vsr-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        var actionHtml = '';
-        if (r.Status === 'Pending') {
-          actionHtml = '<button onclick="openVehicleSaleReviewForm(\'' + r['Queue ID'] + '\')">Fill form</button>';
-        } else if (r.Status === 'Submitted') {
-          var canEdit = (session.role === 'Admin' || session.role === 'Accounts') ||
-            (session.username === r['Submitted By'] && (new Date() - new Date(r['Submitted On'])) / 60000 <= 60);
-          actionHtml = canEdit ? '<button onclick="openVehicleSaleReviewForm(\'' + r['Queue ID'] + '\')">Edit</button>' : '<span style="color:#888; font-size:12px;">Locked</span>';
-        }
-        tr.innerHTML = '<td>' + r['Dealer Code'] + '</td><td>' + r['Invoice No'] + '</td><td>' + (r['Customer Name'] || '') + '</td>' +
-          '<td>' + (r['Model Info'] || '') + '</td><td>' + (r['Purchase Type'] || '') + '</td><td>' + statusBadge_(r.Status) + '</td><td>' + actionHtml + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function openVehicleSaleReviewForm(queueId) {
-    api('listVehicleSaleReviews', session.token).then(function (rows) {
-      var row = null;
-      for (var i = 0; i < rows.length; i++) { if (rows[i]['Queue ID'] === queueId) { row = rows[i]; break; } }
-      if (!row) { showToast_(new Error('Not found.')); return; }
-      vsrCurrentQueueId = queueId;
-
-      document.getElementById('vsr-form-title').textContent = (row.Status === 'Pending' ? 'Review' : 'Edit') + ' invoice ' + row['Invoice No'];
-      document.getElementById('vsr-frames').value = row['Frame Numbers'] || '';
-      document.getElementById('vsr-raw-total').value = formatMoney_(row['Total Invoice Amount']);
-      document.getElementById('vsr-purchase-type').value = row['Purchase Type'] || '';
-      document.getElementById('vsr-financier').value = row['Financier'] || '';
-      document.getElementById('vsr-hypothecation').value = row['Hypothecation'] || '';
-      document.getElementById('vsr-finance-amount').value = row['Finance Amount'] || '';
-      var isFinance = String(row['Purchase Type']).toLowerCase() === 'finance';
-      document.getElementById('vsr-finance-block').style.display = isFinance ? 'flex' : 'none';
-
-      document.querySelectorAll('input[name="vsr-reg-type"]').forEach(function (el) { el.checked = (el.value === row['Registration Type']); });
-      document.getElementById('vsr-reg-amount').value = row['Registration Amount'] || '';
-      document.querySelectorAll('input[name="vsr-ins-type"]').forEach(function (el) { el.checked = (el.value === (row['Insurance Type'] || 'Amount')); });
-      document.getElementById('vsr-ins-amount').value = row['Insurance Amount'] || '';
-      document.querySelectorAll('input[name="vsr-ew-type"]').forEach(function (el) { el.checked = (el.value === (row['EW Type'] || 'Amount')); });
-      document.getElementById('vsr-ew-amount').value = row['EW Amount'] || '';
-      document.getElementById('vsr-hpa-amount').value = row['HPA Amount'] || '';
-
-      onRegistrationTypeChange();
-      onInsuranceTypeChange();
-      onEwTypeChange();
-      document.getElementById('vsr-form-card').style.display = 'block';
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function closeVehicleSaleReviewForm() {
-    document.getElementById('vsr-form-card').style.display = 'none';
-    document.getElementById('vsr-form').reset();
-    vsrCurrentQueueId = null;
-  }
-
-  function onRegistrationTypeChange() {
-    var selected = document.querySelector('input[name="vsr-reg-type"]:checked');
-    var value = selected ? selected.value : '';
-    var disabled = value === 'TR Only' || value === 'No Registration';
-    document.getElementById('vsr-hpa-row').style.display = disabled ? 'none' : 'flex';
-    if (disabled) document.getElementById('vsr-hpa-amount').value = '';
-  }
-
-  function onInsuranceTypeChange() {
-    var selected = document.querySelector('input[name="vsr-ins-type"]:checked');
-    var isOutside = selected && selected.value === 'Insurance from Outside';
-    document.getElementById('vsr-ins-amount').disabled = isOutside;
-    if (isOutside) document.getElementById('vsr-ins-amount').value = 0;
-  }
-
-  function onEwTypeChange() {
-    var selected = document.querySelector('input[name="vsr-ew-type"]:checked');
-    var isNoEw = selected && selected.value === 'No EW';
-    document.getElementById('vsr-ew-amount').disabled = isNoEw;
-    if (isNoEw) document.getElementById('vsr-ew-amount').value = 0;
-  }
-
-  function handleSubmitVehicleSaleReview(event) {
-    event.preventDefault();
-    var regRadio = document.querySelector('input[name="vsr-reg-type"]:checked');
-    if (!regRadio) { showToast_(new Error('Registration option chuno.')); return; }
-    var insRadio = document.querySelector('input[name="vsr-ins-type"]:checked');
-    var ewRadio = document.querySelector('input[name="vsr-ew-type"]:checked');
-
-    var formData = {
-      registrationType: regRadio.value,
-      registrationAmount: document.getElementById('vsr-reg-amount').value,
-      insuranceType: insRadio ? insRadio.value : 'Amount',
-      insuranceAmount: document.getElementById('vsr-ins-amount').value,
-      ewType: ewRadio ? ewRadio.value : 'Amount',
-      ewAmount: document.getElementById('vsr-ew-amount').value,
-      hpaAmount: document.getElementById('vsr-hpa-amount').value,
-      financierOverride: document.getElementById('vsr-financier').value,
-      financeAmountOverride: document.getElementById('vsr-finance-amount').value
-    };
-
-    api('submitVehicleSaleReview', session.token, vsrCurrentQueueId, formData).then(function () {
-      showToast_(null, 'Posted to ledger.');
-      closeVehicleSaleReviewForm();
-      loadVehicleSaleReviews();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ------------------------------------------------------------ Parts Review-
-  function loadPartsSaleReviewQueue() {
-    api('listPartsSaleReviewQueue', session.token).then(function (rows) {
-      var tbody = document.getElementById('psr-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        var actionHtml = r.Status === 'Pending'
-          ? '<button onclick="handleAssignPartsSale(' + jsArg_(r['Queue ID']) + ', ' + jsArg_(r['Suggested Dealer Code']) + ')">Assign to ' + r['Suggested Dealer Code'] + '</button>'
-          : '';
-        tr.innerHTML = '<td>' + r['Invoice No'] + '</td><td>' + formatDateDisplay_(r['Invoice Date']) + '</td><td>' + (r['Account Name'] || '') + '</td>' +
-          '<td>' + (r['Account GSTIN'] || '-') + '</td><td>' + formatMoney_(r['Total Invoice Value']) + '</td>' +
-          '<td>' + (r['Suggested Dealer Code'] || '') + '</td><td>' + statusBadge_(r.Status) + '</td><td>' + actionHtml + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleAssignPartsSale(queueId, suggestedDealerCode) {
-    var dealerCode = window.prompt('Kis Dealer Code ko assign karna hai?', suggestedDealerCode || '');
-    if (!dealerCode) return;
-    api('assignPartsSaleReview', session.token, queueId, dealerCode).then(function () {
-      showToast_(null, 'Assigned and posted to ledger.');
-      loadPartsSaleReviewQueue();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  // ----------------------------------------------------------------- Imports-
-  function loadImportLog() {
-    api('getImportLog', session.token).then(function (rows) {
-      var tbody = document.getElementById('import-log-table-body');
-      tbody.innerHTML = '';
-      (rows || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td>' + r['Upload Time'] + '</td><td>' + (r['Folder Type'] || '') + '</td><td>' + r['File Name'] + '</td>' +
-          '<td>' + r['Records Processed'] + '</td><td>' + r['Duplicates Skipped'] + '</td><td>' + (r['Updated Count'] || 0) + '</td>' +
-          '<td>' + (r['Reversed Count'] || 0) + '</td><td>' + r.Status + '</td>';
-        tbody.appendChild(tr);
-      });
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  function handleImportNow() {
-    document.getElementById('import-now-result').textContent = 'Running... yeh 1-2 minute le sakta hai.';
-    api('runImportNow', session.token).then(function (results) {
-      document.getElementById('import-now-result').textContent = 'Ho gaya: ' + JSON.stringify(results);
-      loadImportLog();
-      loadDashboardSummary();
-    }).catch(function (err) { showToast_(err); });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
-    document.getElementById('new-dealer-form').addEventListener('submit', handleCreateDealer);
-    document.getElementById('new-entry-form').addEventListener('submit', handleAddLedgerEntry);
-    document.getElementById('opening-balance-form').addEventListener('submit', handleSetOpeningBalance);
-    document.getElementById('ledger-dealer-select').addEventListener('change', onLedgerDealerChange);
-    document.getElementById('new-payment-form').addEventListener('submit', handleSubmitPayment);
-    document.getElementById('new-return-form').addEventListener('submit', handleSubmitReturn);
-    document.getElementById('new-commission-rule-form').addEventListener('submit', handleAddCommissionRule);
-    document.getElementById('calc-commission-form').addEventListener('submit', handleCalculateCommission);
-    document.getElementById('new-user-form').addEventListener('submit', handleCreateUser);
-    document.getElementById('vsr-form').addEventListener('submit', handleSubmitVehicleSaleReview);
-  });
-</script>
-
+  <script type="module" src="assets/js/app.js"></script>
 </body>
 </html>

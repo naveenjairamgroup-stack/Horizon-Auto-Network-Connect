@@ -1,0 +1,11 @@
+# Node / tooling
+node_modules/
+*.log
+.DS_Store
+
+# clasp local auth (never commit your Google credentials)
+.clasprc.json
+
+# Editor
+.vscode/*
+!.vscode/settings.json
