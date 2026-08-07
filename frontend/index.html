@@ -516,17 +516,17 @@
 
   function api(action, ...args) {
 
-    return fetch(API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            action: action,
-            args: args
-        })
-    })
-    .then(res => res.json());
+  const form = new URLSearchParams();
+  form.append("data", JSON.stringify({
+    action: action,
+    args: args
+  }));
+
+  return fetch(API_URL, {
+    method: "POST",
+    body: form
+  })
+  .then(res => res.json());
 
 }
 
