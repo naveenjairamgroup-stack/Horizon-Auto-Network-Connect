@@ -497,6 +497,7 @@
 
   <script>
   var session = null;
+  const API_URL = "https://script.google.com/macros/s/AKfycbzv7fSgbB87N9TbndU6HI08JDfkj59gZxgM08SOVsmyS66pn_3O4FUeySGhr4LVeds/exec";
 
   /** Promise wrapper around google.script.run so every backend call can use .then()/.catch(). */
   /**
@@ -513,18 +514,21 @@
     return JSON.stringify(value).replace(/"/g, '&quot;');
   }
 
-  function api(fnName) {
-    var args = Array.prototype.slice.call(arguments, 1);
-    return new Promise(function (resolve, reject) {
-      google.script.run
-        .withSuccessHandler(function (res) {
-          if (res && res.success === false) reject(new Error(res.error));
-          else resolve(res && res.data !== undefined ? res.data : res);
+  function api(action, ...args) {
+
+    return fetch(API_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            action: action,
+            args: args
         })
-        .withFailureHandler(function (err) { reject(err); })
-        [fnName].apply(null, args);
-    });
-  }
+    })
+    .then(res => res.json());
+
+}
 
   function showPage(pageId) {
     document.querySelectorAll('.page').forEach(function (el) { el.style.display = 'none'; });
