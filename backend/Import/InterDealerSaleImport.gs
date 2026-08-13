@@ -130,4 +130,5 @@ function deleteRowsWhere_(tabName, rows) {
   var sheet = getSpreadsheet().getSheetByName(tabName);
   var rowNumbers = rows.map(function (r) { return r._row; }).sort(function (a, b) { return b - a; }); // delete bottom-up
   rowNumbers.forEach(function (rn) { sheet.deleteRow(rn); });
+  invalidateSheetCache_(tabName);
 }

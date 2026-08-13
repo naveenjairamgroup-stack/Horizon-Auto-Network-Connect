@@ -57,13 +57,14 @@ function runStockImport_(actor) {
 
   var totalsByDealer = {}; // Dealer Code -> running sum of Ex-Showroom Value
   var processed = 0, skipped = 0;
+  var detailRowsToInsert = [];
   grouped.order.forEach(function (invLocation) {
     var dealerCode = aliasMap[normalizeName_(invLocation)];
     var lines = grouped.groups[invLocation];
     if (!dealerCode) { skipped += lines.length; return; }
     lines.forEach(function (v) {
       var price = lookupExShowroomPrice_(v['Model Variant']);
-      appendRow(SHEETS.INVENTORY_DETAIL, {
+      detailRowsToInsert.push({
         'Detail ID': generateId('INV'),
         'Dealer Code': dealerCode,
         'Frame No': v['Frame #'],
@@ -71,11 +72,15 @@ function runStockImport_(actor) {
         'Color': v['Color'],
         'Ex-Showroom Value': price,
         'Created On': new Date()
-      }, 'System (Import)');
+      });
       totalsByDealer[dealerCode] = (totalsByDealer[dealerCode] || 0) + price;
       processed++;
     });
   });
+  // One Sheets API call for every vehicle in this import, instead of one
+  // call PER vehicle — the difference between ~1 request and 300+ for a
+  // typical stock file.
+  appendRows(SHEETS.INVENTORY_DETAIL, detailRowsToInsert, 'System (Import)');
 
   // Replace every configured dealer's "Total Stock" ledger row — including
   // dealers who dropped to zero (not in this file at all), so their old

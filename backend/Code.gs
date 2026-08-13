@@ -6,30 +6,25 @@
  * ---------------------------------------------------------------------
  * WHY THIS LOOKS DIFFERENT FROM A TYPICAL APPS SCRIPT WEB APP
  * ---------------------------------------------------------------------
- * The frontend now lives on Cloudflare Pages (a different domain), not
- * inside Apps Script's own HtmlService. That means `google.script.run` —
- * the usual way an Apps Script HTML page talks to its backend — is not
- * available here at all; it only works when the HTML is served BY Apps
- * Script itself. So this backend is called instead as an ordinary HTTP
- * JSON API, the same way you'd call any REST endpoint from a browser.
+ * The frontend lives on Cloudflare Pages (a different domain), not inside
+ * Apps Script's own HtmlService, so `google.script.run` isn't available —
+ * it only works when the HTML is served BY Apps Script itself.
  *
- * Request shape (POST, sent by frontend/assets/js/api.js):
- *   Content-Type: text/plain;charset=utf-8   (deliberately NOT
- *     application/json — that content type forces the browser to send a
- *     CORS "preflight" OPTIONS request first, and Apps Script Web Apps
- *     have no way to answer an OPTIONS request. text/plain is treated by
- *     the browser as a "simple request", so no preflight happens and the
- *     call just works.)
+ * The browser never calls this URL directly. It calls a Cloudflare Pages
+ * Function at /api (frontend/functions/api.js), which forwards the request
+ * to here server-side. Server-to-server requests aren't subject to browser
+ * CORS rules, so this sidesteps a CORS/ORB quirk this particular Workspace
+ * deployment has with direct browser calls — see api.js's comment for the
+ * full story.
+ *
+ * Request shape (POST, sent by the Cloudflare Function):
+ *   Content-Type: text/plain;charset=utf-8
  *   Body: {"fn": "listDealers", "args": [token, ...]}
  *
  * Response: {"success": true, "data": ...} or {"success": false, "error": "..."}
  * exactly the same shape safeRun() already produced before — the business
  * logic and its wrapping are completely unchanged, only the transport
  * around them is new.
- *
- * GET requests with ?fn=...&args=... are also accepted, purely so a
- * function can be poked directly from a browser address bar while
- * debugging. The real frontend always uses POST (see api.js).
  * ---------------------------------------------------------------------
  */
 
@@ -114,47 +109,44 @@ function doGet(e) {
   }
   return jsonOutput_({
     success: true,
-    message: 'Horizon Auto — Network Connect API is running. Send POST requests from the frontend app.'
+    message: 'Horizon Auto — Network Connect API is running. The app calls this via POST through a Cloudflare Pages Function proxy.'
   });
 }
 
 function handleApiRequest_(e) {
-  var fn, args, callback;
+  var fn, args;
   try {
     if (e.postData && e.postData.contents) {
       var body = JSON.parse(e.postData.contents);
       fn = body.fn;
       args = body.args || [];
-      callback = e.parameter && e.parameter.callback;
     } else if (e.parameter && e.parameter.fn) {
       fn = e.parameter.fn;
       args = e.parameter.args ? JSON.parse(e.parameter.args) : [];
-      callback = e.parameter.callback;
     } else {
       return jsonOutput_({ success: false, error: 'No function name (fn) supplied.' });
     }
   } catch (parseErr) {
-    return jsonOutput_({ success: false, error: 'Bad request — could not parse JSON: ' + parseErr.message }, callback);
+    return jsonOutput_({ success: false, error: 'Bad request — could not parse JSON: ' + parseErr.message });
   }
 
   var target = API_DISPATCH[fn];
   if (typeof target !== 'function') {
-    return jsonOutput_({ success: false, error: 'Unknown or unauthorized function: ' + fn }, callback);
+    return jsonOutput_({ success: false, error: 'Unknown or unauthorized function: ' + fn });
   }
 
   try {
     var result = target.apply(null, args);
-    return jsonOutput_(result, callback);
+    return jsonOutput_(result);
   } catch (err) {
-    return jsonOutput_({ success: false, error: err.message }, callback);
+    // Business-logic functions already catch their own errors via safeRun()
+    // and return {success:false, error:...} normally: this catch only
+    // matters for something unexpected escaping that (e.g. a bad argument
+    // count), so the caller still gets clean JSON instead of a raw 500.
+    return jsonOutput_({ success: false, error: err.message });
   }
 }
 
-function jsonOutput_(obj, callback) {
-  var json = JSON.stringify(obj);
-  if (callback) {
-    return ContentService.createTextOutput(callback + '(' + json + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+function jsonOutput_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }

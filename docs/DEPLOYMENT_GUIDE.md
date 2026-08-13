@@ -1,6 +1,16 @@
 # Deployment Guide
 
-Two independent deployments, connected by one URL.
+Two independent deployments, connected by one Cloudflare Pages Function
+acting as a proxy.
+
+```
+Browser ──same-origin──▶ Cloudflare Pages Function (/api)  ──server-to-server──▶  Apps Script Web App ──▶ Google Sheet
+```
+
+The browser never talks to Apps Script directly. It calls `/api` on its own
+domain; a small Cloudflare Pages Function (`frontend/functions/api.js`)
+forwards that request to Apps Script server-side and returns the result.
+See "Why a proxy?" below for why this exists.
 
 ---
 
@@ -18,9 +28,8 @@ same one that owns the Apps Script project / the Google Sheet).
 
 ### 1.2 Connect this repo's `backend/` folder to your existing Apps Script project
 
-If you already have the Apps Script project (the one bound to your Google
-Sheet database) open in the Apps Script editor, grab its **Script ID**:
-Project Settings (⚙️ gear icon) → "Script ID".
+Grab your Apps Script project's **Script ID**: open it in the Apps Script
+editor → Project Settings (⚙️ gear icon) → "Script ID".
 
 Paste it into `backend/.clasp.json`:
 
@@ -39,45 +48,31 @@ clasp push
 ```
 
 This uploads every `.gs` file here to the Apps Script project, **replacing**
-whatever is currently there. Since this `backend/` folder already contains
-every original file plus the new `Code.gs` (API dispatcher), a push here is
-a complete, correct replacement — nothing manual to reconcile.
+whatever is currently there.
 
 > First time only: also run `setupDatabase()` from the Apps Script editor
-> if you haven't already (creates/migrates all the Sheet tabs). This is
-> unrelated to the frontend move — same one-time step as before.
+> if you haven't already (creates/migrates all the Sheet tabs).
 
 ### 1.4 Deploy as a Web App
 
-In the Apps Script editor: **Deploy → Manage deployments → pencil icon →
-New version → Deploy**. Confirm the settings are:
+**Deploy → Manage deployments → pencil icon → New version → Deploy.**
+Confirm:
 
 - Execute as: **Me**
 - Who has access: **Anyone**
 
-(`backend/appsscript.json` already encodes this — `ANYONE_ANONYMOUS` /
-`USER_DEPLOYING` — so a fresh deploy should keep it right automatically.)
-
-Copy the `/exec` URL shown — you need it for the frontend next.
+Copy the **plain** `/exec` URL — the one shaped like
+`https://script.google.com/macros/s/AKfycb.../exec` (no `/a/macros/yourdomain.com/`
+in it). You need it in step 2.2.
 
 ---
 
 ## Part 2 — Frontend (Cloudflare Pages via GitHub)
 
-### 2.1 Point the frontend at your backend
+### 2.1 Connect Cloudflare Pages to this repo (one-time)
 
-Open `frontend/assets/js/config.js` and paste the `/exec` URL from step 1.4:
-
-```js
-export const BACKEND_URL = 'https://script.google.com/macros/s/AKfycb.../exec';
-```
-
-Commit this change every time you redeploy the backend and get a new URL.
-
-### 2.2 Connect Cloudflare Pages to this repo (one-time)
-
-In the Cloudflare dashboard: **Workers & Pages → Create → Pages → Connect
-to Git** → pick this repository. Build settings:
+**Workers & Pages → Create → Pages → Connect to Git** → pick this
+repository. Build settings:
 
 | Setting | Value |
 |---|---|
@@ -85,9 +80,25 @@ to Git** → pick this repository. Build settings:
 | Build command | *(leave empty)* |
 | Build output directory | `frontend` |
 
-No build command is needed — this is plain static HTML/CSS/JS, so Cloudflare
-just serves the `frontend/` folder as-is. Every push to your main branch
-auto-deploys.
+No build command is needed — plain static HTML/CSS/JS, Cloudflare just
+serves the `frontend/` folder as-is (and automatically runs the Function in
+`frontend/functions/`). Every push to your main branch auto-deploys.
+
+### 2.2 Tell the proxy where your backend is
+
+In the Cloudflare dashboard: your Pages project → **Settings → Environment
+variables** → **Add variable**:
+
+| Name | Value |
+|---|---|
+| `APPS_SCRIPT_URL` | the `/exec` URL from step 1.4 |
+
+Add it for **both** Production and Preview environments. After adding it,
+**redeploy** (Deployments tab → ⋯ on the latest → Retry deployment) —
+environment variable changes only take effect on a new deployment.
+
+> This is the *only* place the Apps Script URL lives. The browser-side code
+> never sees it — it only ever calls `/api` on its own domain.
 
 ### 2.3 If you edited a page fragment
 
@@ -99,38 +110,54 @@ cd frontend
 python3 build.py
 ```
 
-(Plain Python 3, no dependencies — this only runs on your machine, never on
-Cloudflare.)
-
 ---
 
-## Why the transport had to change (CORS, in one paragraph)
+## Why a proxy? (what actually went wrong, and why this fixes it)
 
 `google.script.run` — the usual way an Apps Script page talks to its own
-backend — only exists when the HTML is served *by* Apps Script itself.
-Since the frontend now lives on a different domain (Cloudflare Pages), it
-calls the backend as a plain HTTP API instead (see `frontend/assets/js/api.js`
-and `backend/Code.gs`). Requests are sent as `POST` with
-`Content-Type: text/plain` — deliberately *not* `application/json` — because
-a JSON content type forces the browser to send a CORS "preflight" `OPTIONS`
-request first, and Apps Script Web Apps have no way to answer an `OPTIONS`
-request. `text/plain` is treated as a "simple request", so no preflight
-happens, and Apps Script can still `JSON.parse()` the body just fine on its
-end. Every function's business logic — validation, safeRun() error
-wrapping, everything — is completely unchanged; only this one transport
-detail is new.
+backend — only works when the HTML is served *by* Apps Script itself. Since
+the frontend lives on Cloudflare Pages (a different domain), it can't use
+that at all.
+
+The next thing to reach for is normally a plain cross-origin `fetch()` —
+Apps Script Web Apps are supposed to send an `Access-Control-Allow-Origin`
+header on their responses so this works. In practice, **this specific
+deployment (a Google Workspace domain-restricted Apps Script project)
+doesn't reliably send that header**, on GET or POST. A `<script>`-tag/JSONP
+workaround was tried next, since script tags aren't subject to CORS at all
+— but Chrome's ORB (Opaque Response Blocking, a newer security feature)
+rejected that too, because Apps Script's response headers weren't exactly
+what ORB wants from something loaded as a script.
+
+Both of those failure modes are specific to **browser** cross-origin rules.
+Server-to-server requests aren't cross-origin at all — there's no browser
+involved to enforce CORS — so a tiny server-side proxy sidesteps the entire
+problem, permanently, regardless of any Workspace-side quirk. That's what
+`frontend/functions/api.js` is: a Cloudflare Pages Function (runs
+server-side, next to your static files, zero extra hosting needed) that
+receives the browser's request on `/api` and forwards it to Apps Script
+itself. The browser only ever calls its own domain.
+
+Every backend function's business logic — validation, `safeRun()` error
+wrapping, everything — is completely unchanged; only the transport hop in
+the middle is new.
 
 ---
 
 ## Troubleshooting
 
-**Login just spins / fails with a generic network error**
-Open the browser console (F12). A CORS error naming your Cloudflare Pages
-domain almost always means `BACKEND_URL` in `config.js` is wrong, stale (an
-old deployment ID), or the Apps Script deployment's access isn't set to
-"Anyone". Re-check step 1.4 and 2.1.
+**"Server misconfiguration: APPS_SCRIPT_URL environment variable is not set"**
+You skipped or mistyped step 2.2, or added the variable but haven't
+redeployed since. Environment variable changes need a fresh deployment to
+take effect.
 
-**A specific feature works from Admin but a new function you added doesn't work at all**
+**Login just spins / "Could not reach the backend"**
+The `APPS_SCRIPT_URL` value itself is wrong or stale — re-copy it from
+Apps Script (Deploy → Manage deployments), making sure it's the plain
+`script.google.com/macros/s/.../exec` form, not the `/a/macros/yourdomain/`
+form.
+
+**A specific feature works but a new function you added doesn't work at all**
 You likely forgot to add the new function to `API_DISPATCH` in
 `backend/Code.gs` — anything not listed there is refused, on purpose (see
 README §"Adding a new backend function").
@@ -138,5 +165,12 @@ README §"Adding a new backend function").
 **Everything worked yesterday, nothing works today, no code changed**
 Check the Apps Script deployment is still live (Deploy → Manage
 deployments) — redeploying a *new version* is required after any `clasp
-push`; pushing code alone does not update the live `/exec` URL's behaviour
-until you deploy a new version pointing at HEAD.
+push`; pushing code alone does not update the live `/exec` URL's behaviour.
+
+**Testing locally**
+Plain static servers (`npx serve`, VS Code Live Server, etc.) don't run
+Cloudflare Pages Functions, so `/api` won't exist and every call will fail
+locally that way. Either test against the real deployed Cloudflare Pages
+URL, or run `npx wrangler pages dev frontend` locally, which does emulate
+Functions (you'll need to pass the env var: `npx wrangler pages dev
+frontend --binding APPS_SCRIPT_URL="https://script.google.com/macros/s/.../exec"`).
