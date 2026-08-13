@@ -55,34 +55,45 @@ function listPayments(token, filterStatus) {
 function approvePayment(token, paymentId) {
   return safeRun('approvePayment', function () {
     var session = requireRole_(token, PERMISSIONS.Payments.approve);
-    var payment = findRow(SHEETS.PAYMENT_ENTRIES, 'Payment ID', paymentId);
-    if (!payment) throw new Error('Payment not found: ' + paymentId);
-    if (payment['Approval Status'] !== APPROVAL_STATUS.PENDING) {
-      throw new Error('This payment is already ' + payment['Approval Status'] + '.');
-    }
-    updateRowWhere(SHEETS.PAYMENT_ENTRIES, 'Payment ID', paymentId, {
-      'Approval Status': APPROVAL_STATUS.APPROVED,
-      'Approved By': session.username,
-      'Approved On': new Date(),
-      'Posted To Ledger': true
-    }, session.username);
 
-    var entryRow = {
-      'Entry ID': generateId('LED'),
-      'Date': payment.Date,
-      'Invoice No': payment['Reference No'] || '',
-      'Head': 'Payment Received',
-      'Dealer Code': payment['Dealer Code'],
-      'Debit': 0,
-      'Credit': Number(payment.Amount),
-      'Running Balance': 0,
-      'Remarks': 'Payment (' + payment.Mode + ') approved by ' + session.username,
-      'Created By': session.username,
-      'Timestamp': new Date()
-    };
-    appendRow(SHEETS.LEDGER_TRANSACTIONS, entryRow, session.username);
-    recomputeRunningBalance_(payment['Dealer Code']);
-    return true;
+    // See submitVehicleSaleReview's comment for why this lock exists — a
+    // double-click or retry approving the SAME payment twice in quick
+    // succession could otherwise both read "Pending" and both post a
+    // ledger credit, with no reversal step here to undo the duplicate.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var payment = findRow(SHEETS.PAYMENT_ENTRIES, 'Payment ID', paymentId);
+      if (!payment) throw new Error('Payment not found: ' + paymentId);
+      if (payment['Approval Status'] !== APPROVAL_STATUS.PENDING) {
+        throw new Error('This payment is already ' + payment['Approval Status'] + '.');
+      }
+      updateRowWhere(SHEETS.PAYMENT_ENTRIES, 'Payment ID', paymentId, {
+        'Approval Status': APPROVAL_STATUS.APPROVED,
+        'Approved By': session.username,
+        'Approved On': new Date(),
+        'Posted To Ledger': true
+      }, session.username);
+
+      var entryRow = {
+        'Entry ID': generateId('LED'),
+        'Date': payment.Date,
+        'Invoice No': payment['Reference No'] || '',
+        'Head': 'Payment Received',
+        'Dealer Code': payment['Dealer Code'],
+        'Debit': 0,
+        'Credit': Number(payment.Amount),
+        'Running Balance': 0,
+        'Remarks': 'Payment (' + payment.Mode + ') approved by ' + session.username,
+        'Created By': session.username,
+        'Timestamp': new Date()
+      };
+      appendRow(SHEETS.LEDGER_TRANSACTIONS, entryRow, session.username);
+      recomputeRunningBalance_(payment['Dealer Code']);
+      return true;
+    } finally {
+      lock.releaseLock();
+    }
   });
 }
 

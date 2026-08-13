@@ -18,7 +18,8 @@ import { loadDealers, handleCreateDealer, handleEditVehicleSaleAlias, handleEdit
 import { onUserRoleChange, handleCreateUser, handleResetPassword, handleToggleUser } from './pages/userMaster.js';
 import {
   onLedgerDealerChange, handleAddLedgerEntry, handleSetOpeningBalance,
-  openDetailModal, closeDetailModal, openInventoryDetailModal
+  openDetailModal, closeDetailModal, openInventoryDetailModal,
+  handleFindLedgerCleanup, handleDeleteLedgerCleanup
 } from './pages/ledger.js';
 import { handleSubmitPayment, handleApprovePayment, handleRejectPayment } from './pages/payments.js';
 import {
@@ -72,6 +73,8 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('calc-commission-form').addEventListener('submit', handleCalculateCommission);
   document.getElementById('new-user-form').addEventListener('submit', handleCreateUser);
   document.getElementById('vsr-form').addEventListener('submit', handleSubmitVehicleSaleReview);
+  document.getElementById('cleanup-find-btn').addEventListener('click', handleFindLedgerCleanup);
+  document.getElementById('cleanup-delete-btn').addEventListener('click', handleDeleteLedgerCleanup);
   initializeAuth();
 });
 

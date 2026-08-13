@@ -101,6 +101,43 @@ export function handleSetOpeningBalance(event) {
   }).catch(function (err) { showToast_(err); });
 }
 
+// ------------------------------------------ Admin duplicate-entry cleanup -
+export function handleFindLedgerCleanup() {
+  var invoiceNo = document.getElementById('cleanup-invoice-no').value.trim();
+  if (!invoiceNo) { showToast_(new Error('Invoice No daalo pehle.')); return; }
+  api('findLedgerEntriesByInvoice', session.token, invoiceNo).then(function (rows) {
+    var tbody = document.getElementById('cleanup-table-body');
+    tbody.innerHTML = '';
+    (rows || []).forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td><input type="checkbox" class="cleanup-row-check" value="' + r['Entry ID'] + '"></td>' +
+        '<td>' + formatDateDisplay_(r['Invoice Date'] || r.Date) + '</td><td>' + r.Head + '</td><td>' + r['Dealer Code'] + '</td>' +
+        '<td>' + (Number(r.Debit) ? formatMoney_(r.Debit) : '') + '</td>' +
+        '<td>' + (Number(r.Credit) ? formatMoney_(r.Credit) : '') + '</td>' +
+        '<td>' + (r.Remarks || '') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('cleanup-delete-btn').style.display = (rows && rows.length) ? 'inline-block' : 'none';
+    if (!rows || !rows.length) showToast_(null, 'Is invoice ke liye koi ledger entry nahi mili.');
+  }).catch(function (err) { showToast_(err); });
+}
+
+export function handleDeleteLedgerCleanup() {
+  var checked = Array.prototype.slice.call(document.querySelectorAll('.cleanup-row-check:checked'));
+  if (!checked.length) { showToast_(new Error('Kam se kam ek entry select karo delete karne ke liye.')); return; }
+  var entryIds = checked.map(function (c) { return c.value; });
+  if (!window.confirm(entryIds.length + ' entries delete karni hain? Yeh Running Balance bhi turant sahi kar dega. Yeh wapas nahi ho sakta.')) return;
+  api('deleteLedgerEntries', session.token, entryIds).then(function (result) {
+    showToast_(null, result.deleted + ' entries delete ho gayi. Dealer(s) ka balance recompute ho gaya.');
+    document.getElementById('cleanup-table-body').innerHTML = '';
+    document.getElementById('cleanup-delete-btn').style.display = 'none';
+    result.dealersRecomputed.forEach(function (dc) {
+      var select = document.getElementById('ledger-dealer-select');
+      if (select && select.value === dc) loadLedger(dc);
+    });
+  }).catch(function (err) { showToast_(err); });
+}
+
 // ---------------------------------------------------------- Detail modal --
 export function openDetailModal(invoiceNo, dealerCode, head) {
   api('getInvoiceDetail', session.token, invoiceNo, dealerCode, head).then(function (detail) {

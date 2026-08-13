@@ -245,6 +245,26 @@
   </form>
 </div>
 
+<div class="card" id="ledger-cleanup-card">
+  <h2>Admin: find &amp; remove duplicate/mistaken entries</h2>
+  <p style="color:#888; font-size:13px; margin-top:-8px;">
+    Type an Invoice No to see every ledger row for it. Tick the ones that
+    shouldn't be there (e.g. duplicate postings from a double-submit) and
+    delete them — this recomputes the dealer's Running Balance afterwards,
+    and is logged in the Audit Log like any other action. Nothing is
+    guessed or auto-selected; you choose exactly what gets removed.
+  </p>
+  <div class="form-row">
+    <div style="flex:2"><label>Invoice No</label><input id="cleanup-invoice-no" placeholder="e.g. JH11000226V01765"></div>
+    <div style="display:flex; align-items:flex-end;"><button type="button" id="cleanup-find-btn">Find entries</button></div>
+  </div>
+  <table>
+    <thead><tr><th></th><th>Date</th><th>Head</th><th>Dealer</th><th>Debit</th><th>Credit</th><th>Remarks</th></tr></thead>
+    <tbody id="cleanup-table-body"></tbody>
+  </table>
+  <button type="button" id="cleanup-delete-btn" style="margin-top:10px; display:none;">Delete selected</button>
+</div>
+
         </div>
         <div id="page-Payments" class="page">
 <div class="card">

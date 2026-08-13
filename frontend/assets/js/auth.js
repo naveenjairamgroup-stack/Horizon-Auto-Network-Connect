@@ -26,6 +26,7 @@ function showMainUI() {
   var canEditLedger = (session.role === 'Admin' || session.role === 'Accounts');
   document.getElementById('ledger-entry-card').style.display = canEditLedger ? 'block' : 'none';
   document.getElementById('opening-balance-card').style.display = canEditLedger ? 'block' : 'none';
+  document.getElementById('ledger-cleanup-card').style.display = (session.role === 'Admin') ? 'block' : 'none';
   document.getElementById('ledger-dealer-picker').style.display = (session.role === 'Dealer') ? 'none' : 'flex';
 
   loadVoucherHeadOptions();

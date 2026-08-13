@@ -77,35 +77,43 @@ function listReturns(token, filterStatus) {
 function approveReturn(token, returnId) {
   return safeRun('approveReturn', function () {
     var session = requireRole_(token, PERMISSIONS.Returns.approve);
-    var ret = findRow(SHEETS.RETURN_ENTRIES, 'Return ID', returnId);
-    if (!ret) throw new Error('Return not found: ' + returnId);
-    if (ret['Approval Status'] !== APPROVAL_STATUS.PENDING) {
-      throw new Error('This return is already ' + ret['Approval Status'] + '.');
-    }
-    updateRowWhere(SHEETS.RETURN_ENTRIES, 'Return ID', returnId, {
-      'Approval Status': APPROVAL_STATUS.APPROVED,
-      'Approved By': session.username,
-      'Approved On': new Date(),
-      'Posted To Ledger': true
-    }, session.username);
 
-    var head = ret['Return Type'] === 'Vehicle' ? 'Vehicle Purchase / Return' : 'Parts Purchase / Return';
-    var entryRow = {
-      'Entry ID': generateId('LED'),
-      'Date': ret['Invoice Date'],
-      'Invoice No': ret['Invoice No'],
-      'Head': head,
-      'Dealer Code': ret['Dealer Code'],
-      'Debit': 0,
-      'Credit': Number(ret['Total Amount']),
-      'Running Balance': 0,
-      'Remarks': ret['Return Type'] + ' return approved by ' + session.username + (ret['Frame Numbers'] ? (' | Frames: ' + ret['Frame Numbers']) : ''),
-      'Created By': session.username,
-      'Timestamp': new Date()
-    };
-    appendRow(SHEETS.LEDGER_TRANSACTIONS, entryRow, session.username);
-    recomputeRunningBalance_(ret['Dealer Code']);
-    return true;
+    // See submitVehicleSaleReview's comment for why this lock exists.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var ret = findRow(SHEETS.RETURN_ENTRIES, 'Return ID', returnId);
+      if (!ret) throw new Error('Return not found: ' + returnId);
+      if (ret['Approval Status'] !== APPROVAL_STATUS.PENDING) {
+        throw new Error('This return is already ' + ret['Approval Status'] + '.');
+      }
+      updateRowWhere(SHEETS.RETURN_ENTRIES, 'Return ID', returnId, {
+        'Approval Status': APPROVAL_STATUS.APPROVED,
+        'Approved By': session.username,
+        'Approved On': new Date(),
+        'Posted To Ledger': true
+      }, session.username);
+
+      var head = ret['Return Type'] === 'Vehicle' ? 'Vehicle Purchase / Return' : 'Parts Purchase / Return';
+      var entryRow = {
+        'Entry ID': generateId('LED'),
+        'Date': ret['Invoice Date'],
+        'Invoice No': ret['Invoice No'],
+        'Head': head,
+        'Dealer Code': ret['Dealer Code'],
+        'Debit': 0,
+        'Credit': Number(ret['Total Amount']),
+        'Running Balance': 0,
+        'Remarks': ret['Return Type'] + ' return approved by ' + session.username + (ret['Frame Numbers'] ? (' | Frames: ' + ret['Frame Numbers']) : ''),
+        'Created By': session.username,
+        'Timestamp': new Date()
+      };
+      appendRow(SHEETS.LEDGER_TRANSACTIONS, entryRow, session.username);
+      recomputeRunningBalance_(ret['Dealer Code']);
+      return true;
+    } finally {
+      lock.releaseLock();
+    }
   });
 }
 

@@ -205,26 +205,34 @@ function listPartsSaleReviewQueue(token) {
 function assignPartsSaleReview(token, queueId, dealerCode) {
   return safeRun('assignPartsSaleReview', function () {
     var session = requireRole_(token, PERMISSIONS.PartsSaleReview.assign);
-    var queueRow = findRow(SHEETS.PARTS_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
-    if (!queueRow) throw new Error('Review item not found: ' + queueId);
-    if (queueRow.Status !== 'Pending') throw new Error('This item is already ' + queueRow.Status + '.');
-    if (!findRow(SHEETS.DEALER_MASTER, 'Dealer Code', dealerCode)) throw new Error('Dealer not found: ' + dealerCode);
 
-    var detailRows = findRows(SHEETS.PARTS_SALE_DETAIL, { 'Invoice No': queueRow['Invoice No'] });
-    if (dealerCode !== queueRow['Suggested Dealer Code']) {
-      detailRows.forEach(function (d) {
-        updateRowWhere(SHEETS.PARTS_SALE_DETAIL, 'Detail ID', d['Detail ID'], { 'Dealer Code': dealerCode }, session.username);
-      });
+    // See submitVehicleSaleReview's comment for why this lock exists.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var queueRow = findRow(SHEETS.PARTS_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
+      if (!queueRow) throw new Error('Review item not found: ' + queueId);
+      if (queueRow.Status !== 'Pending') throw new Error('This item is already ' + queueRow.Status + '.');
+      if (!findRow(SHEETS.DEALER_MASTER, 'Dealer Code', dealerCode)) throw new Error('Dealer not found: ' + dealerCode);
+
+      var detailRows = findRows(SHEETS.PARTS_SALE_DETAIL, { 'Invoice No': queueRow['Invoice No'] });
+      if (dealerCode !== queueRow['Suggested Dealer Code']) {
+        detailRows.forEach(function (d) {
+          updateRowWhere(SHEETS.PARTS_SALE_DETAIL, 'Detail ID', d['Detail ID'], { 'Dealer Code': dealerCode }, session.username);
+        });
+      }
+      var total = detailRows.reduce(function (s, d) { return s + Number(d['Final Amount'] || 0); }, 0);
+      postPartsSaleLedgerEntry_(dealerCode, queueRow['Invoice No'], total, 'Parts Sale — assigned by ' + session.username + ' (name-matched, no GST on file)', queueRow['Invoice Date']);
+
+      updateRowWhere(SHEETS.PARTS_SALE_REVIEW_QUEUE, 'Queue ID', queueId, {
+        'Status': 'Assigned',
+        'Assigned Dealer Code': dealerCode,
+        'Assigned By': session.username,
+        'Assigned On': new Date()
+      }, session.username);
+      return true;
+    } finally {
+      lock.releaseLock();
     }
-    var total = detailRows.reduce(function (s, d) { return s + Number(d['Final Amount'] || 0); }, 0);
-    postPartsSaleLedgerEntry_(dealerCode, queueRow['Invoice No'], total, 'Parts Sale — assigned by ' + session.username + ' (name-matched, no GST on file)', queueRow['Invoice Date']);
-
-    updateRowWhere(SHEETS.PARTS_SALE_REVIEW_QUEUE, 'Queue ID', queueId, {
-      'Status': 'Assigned',
-      'Assigned Dealer Code': dealerCode,
-      'Assigned By': session.username,
-      'Assigned On': new Date()
-    }, session.username);
-    return true;
   });
 }

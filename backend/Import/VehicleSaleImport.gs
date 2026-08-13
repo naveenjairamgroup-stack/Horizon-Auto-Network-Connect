@@ -148,80 +148,95 @@ function listVehicleSaleReviews(token) {
 function submitVehicleSaleReview(token, queueId, formData) {
   return safeRun('submitVehicleSaleReview', function () {
     var session = requireRole_(token, PERMISSIONS.VehicleSaleReview.submit);
-    var queueRow = findRow(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
-    if (!queueRow) throw new Error('Review item not found: ' + queueId);
-    if (queueRow.Status === 'Cancelled') throw new Error('This invoice was cancelled — nothing to submit.');
 
-    var isEdit = queueRow.Status === 'Submitted';
-    if (isEdit) {
-      var isAdminOrAccounts = session.role === ROLES.ADMIN || session.role === ROLES.ACCOUNTS;
-      if (!isAdminOrAccounts) {
-        if (session.username !== queueRow['Submitted By']) {
-          throw new Error('Only the original submitter, or Admin/Accounts, can edit this.');
+    // Without this lock, two near-simultaneous submissions of the SAME
+    // invoice (a double-click, or a retry after a slow/failed network
+    // response) can each read the row while it still says "Pending",
+    // meaning neither sees the other as an edit — both skip the reversal
+    // below and post a fresh set of ledger entries, stacking duplicates.
+    // The lock forces the second call to wait until the first one has
+    // fully finished (including its ledger posting), so it reads the
+    // now-"Submitted" status correctly and reverses before re-posting.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var queueRow = findRow(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
+      if (!queueRow) throw new Error('Review item not found: ' + queueId);
+      if (queueRow.Status === 'Cancelled') throw new Error('This invoice was cancelled — nothing to submit.');
+
+      var isEdit = queueRow.Status === 'Submitted';
+      if (isEdit) {
+        var isAdminOrAccounts = session.role === ROLES.ADMIN || session.role === ROLES.ACCOUNTS;
+        if (!isAdminOrAccounts) {
+          if (session.username !== queueRow['Submitted By']) {
+            throw new Error('Only the original submitter, or Admin/Accounts, can edit this.');
+          }
+          var minutesSinceSubmit = (new Date() - new Date(queueRow['Submitted On'])) / 60000;
+          if (minutesSinceSubmit > VEHICLE_SALE_EDIT_WINDOW_MINUTES) {
+            throw new Error('The ' + VEHICLE_SALE_EDIT_WINDOW_MINUTES + '-minute edit window has passed. Ask Admin or Accounts to correct this.');
+          }
         }
-        var minutesSinceSubmit = (new Date() - new Date(queueRow['Submitted On'])) / 60000;
-        if (minutesSinceSubmit > VEHICLE_SALE_EDIT_WINDOW_MINUTES) {
-          throw new Error('The ' + VEHICLE_SALE_EDIT_WINDOW_MINUTES + '-minute edit window has passed. Ask Admin or Accounts to correct this.');
+        reverseAscVehicleLedgerEntries_(queueRow); // undo the previously-posted entries before posting corrected ones
+      }
+
+      requireFields(formData, ['registrationType']);
+      if (['TR Only', 'Permanent Registration', 'No Registration'].indexOf(formData.registrationType) === -1) {
+        throw new Error('Registration Type must be TR Only, Permanent Registration, or No Registration.');
+      }
+      var hpaDisabled = formData.registrationType === 'TR Only' || formData.registrationType === 'No Registration';
+
+      var updates = {
+        'Registration Type': formData.registrationType,
+        'Registration Amount': Number(formData.registrationAmount) || 0,
+        'Insurance Type': formData.insuranceType || 'Amount',
+        'Insurance Amount': formData.insuranceType === 'Insurance from Outside' ? 0 : (Number(formData.insuranceAmount) || 0),
+        'EW Type': formData.ewType || 'Amount',
+        'EW Amount': formData.ewType === 'No EW' ? 0 : (Number(formData.ewAmount) || 0),
+        'HPA Amount': hpaDisabled ? 0 : (Number(formData.hpaAmount) || 0),
+        'Status': 'Submitted',
+        'Submitted By': session.username,
+        'Submitted On': new Date()
+      };
+      if (formData.financierOverride) updates['Financier'] = formData.financierOverride;
+      if (formData.financeAmountOverride !== undefined && formData.financeAmountOverride !== '') {
+        updates['Finance Amount'] = Number(formData.financeAmountOverride) || 0;
+      }
+      updateRowWhere(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId, updates, session.username);
+
+      var finalRow = findRow(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
+      var dealerCode = finalRow['Dealer Code'];
+      var invoiceNo = finalRow['Invoice No'];
+      var totalAmount = computeAscTotalAmount_(finalRow);
+
+      postVehicleSaleLedgerEntry_(dealerCode, invoiceNo, totalAmount, finalRow['Customer Name'] || ('Vehicle sale ' + invoiceNo), finalRow['Invoice Date']);
+
+      if (String(finalRow['Purchase Type']).toLowerCase() === 'finance') {
+        var financierName = (String(finalRow['Financier']).toLowerCase() === 'others')
+          ? finalRow['Hypothecation']
+          : finalRow['Financier'];
+        var financeAmount = parseAmount_(finalRow['Finance Amount']);
+        if (financeAmount > 0 && financierName) {
+          var financeParsedDate = parseInvoiceDate_(finalRow['Invoice Date']);
+          appendRow(SHEETS.LEDGER_TRANSACTIONS, {
+            'Entry ID': generateId('LED'),
+            'Date': financeParsedDate,
+            'Invoice No': invoiceNo,
+            'Head': 'Finance Company Advance',
+            'Dealer Code': dealerCode,
+            'Debit': 0,
+            'Credit': financeAmount,
+            'Running Balance': 0,
+            'Remarks': financierName,
+            'Created By': session.username,
+            'Timestamp': new Date(),
+            'Invoice Date': financeParsedDate
+          }, session.username);
+          recomputeRunningBalance_(dealerCode);
         }
       }
-      reverseAscVehicleLedgerEntries_(queueRow); // undo the previously-posted entries before posting corrected ones
+      return true;
+    } finally {
+      lock.releaseLock();
     }
-
-    requireFields(formData, ['registrationType']);
-    if (['TR Only', 'Permanent Registration', 'No Registration'].indexOf(formData.registrationType) === -1) {
-      throw new Error('Registration Type must be TR Only, Permanent Registration, or No Registration.');
-    }
-    var hpaDisabled = formData.registrationType === 'TR Only' || formData.registrationType === 'No Registration';
-
-    var updates = {
-      'Registration Type': formData.registrationType,
-      'Registration Amount': Number(formData.registrationAmount) || 0,
-      'Insurance Type': formData.insuranceType || 'Amount',
-      'Insurance Amount': formData.insuranceType === 'Insurance from Outside' ? 0 : (Number(formData.insuranceAmount) || 0),
-      'EW Type': formData.ewType || 'Amount',
-      'EW Amount': formData.ewType === 'No EW' ? 0 : (Number(formData.ewAmount) || 0),
-      'HPA Amount': hpaDisabled ? 0 : (Number(formData.hpaAmount) || 0),
-      'Status': 'Submitted',
-      'Submitted By': session.username,
-      'Submitted On': new Date()
-    };
-    if (formData.financierOverride) updates['Financier'] = formData.financierOverride;
-    if (formData.financeAmountOverride !== undefined && formData.financeAmountOverride !== '') {
-      updates['Finance Amount'] = Number(formData.financeAmountOverride) || 0;
-    }
-    updateRowWhere(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId, updates, session.username);
-
-    var finalRow = findRow(SHEETS.VEHICLE_SALE_REVIEW_QUEUE, 'Queue ID', queueId);
-    var dealerCode = finalRow['Dealer Code'];
-    var invoiceNo = finalRow['Invoice No'];
-    var totalAmount = computeAscTotalAmount_(finalRow);
-
-    postVehicleSaleLedgerEntry_(dealerCode, invoiceNo, totalAmount, finalRow['Customer Name'] || ('Vehicle sale ' + invoiceNo), finalRow['Invoice Date']);
-
-    if (String(finalRow['Purchase Type']).toLowerCase() === 'finance') {
-      var financierName = (String(finalRow['Financier']).toLowerCase() === 'others')
-        ? finalRow['Hypothecation']
-        : finalRow['Financier'];
-      var financeAmount = parseAmount_(finalRow['Finance Amount']);
-      if (financeAmount > 0 && financierName) {
-        var financeParsedDate = parseInvoiceDate_(finalRow['Invoice Date']);
-        appendRow(SHEETS.LEDGER_TRANSACTIONS, {
-          'Entry ID': generateId('LED'),
-          'Date': financeParsedDate,
-          'Invoice No': invoiceNo,
-          'Head': 'Finance Company Advance',
-          'Dealer Code': dealerCode,
-          'Debit': 0,
-          'Credit': financeAmount,
-          'Running Balance': 0,
-          'Remarks': financierName,
-          'Created By': session.username,
-          'Timestamp': new Date(),
-          'Invoice Date': financeParsedDate
-        }, session.username);
-        recomputeRunningBalance_(dealerCode);
-      }
-    }
-    return true;
   });
 }

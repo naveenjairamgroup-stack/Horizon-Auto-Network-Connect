@@ -57,6 +57,8 @@ var API_DISPATCH = {
   setOpeningBalance: setOpeningBalance,
   getCreditStatus: getCreditStatus,
   computeOutstanding: computeOutstanding,
+  findLedgerEntriesByInvoice: findLedgerEntriesByInvoice,
+  deleteLedgerEntries: deleteLedgerEntries,
 
   submitPayment: submitPayment,
   listPayments: listPayments,
