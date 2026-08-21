@@ -12,6 +12,13 @@
  * calls it the same way:
  *   api('listDealers', session.token).then(...).catch(...)
  */
+import { clearSession } from './session.js';
+
+function isSessionExpiredError_(message) {
+  if (!message) return false;
+  return /session expired|please log in again/i.test(String(message));
+}
+
 export function api(fnName) {
   var args = Array.prototype.slice.call(arguments, 1);
   return fetch('/api', {
@@ -24,7 +31,16 @@ export function api(fnName) {
       return response.json();
     })
     .then(function (res) {
-      if (res && res.success === false) throw new Error(res.error);
+      if (res && res.success === false) {
+        var error = new Error(res.error);
+        if (isSessionExpiredError_(error.message)) {
+          clearSession();
+          if (typeof window !== 'undefined' && typeof window.location !== 'undefined') {
+            window.location.reload();
+          }
+        }
+        throw error;
+      }
       return res && res.data !== undefined ? res.data : res;
     });
 }
