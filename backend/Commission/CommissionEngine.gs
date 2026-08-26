@@ -1,101 +1,655 @@
 /**
  * CommissionEngine.gs
- * Calculates monthly commission per dealer from Vehicle Sale ledger entries,
- * using the latest applicable rule in Commission_Master, and posts it as a
- * Credit entry (reduces Outstanding) — same as the rest of the ledger.
+ * Network commission payable to ASC dealers on the vehicles they sell.
  *
- * SIMPLIFICATION, flagged rather than guessed at: Commission_Master is
- * defined per Vehicle Model in the original spec, but Ledger_Transactions
- * doesn't currently capture Model on each entry. This engine applies the
- * single most-recent Commission_Master rule to a dealer's total Vehicle
- * Sale volume for the month. If per-model commission is needed later, add
- * a "Model" column to Ledger_Transactions and to this calculation.
+ * ---------------------------------------------------------------------
+ * WHAT IS BEING CALCULATED
+ * ---------------------------------------------------------------------
+ * One row per FRAME (not per invoice), exactly mirroring the spreadsheet
+ * this replaces. Three components add up per frame:
+ *
+ *   Vehicle commission  Model Variant -> Commission_Rate_Master
+ *   Registration        a flat amount, ONLY when Registration Type is
+ *                       'Permanent Registration' (TR Only / No Registration
+ *                       earn nothing)
+ *   Insurance           (Insurance Amount / 1.18) x rate%, where the rate is
+ *                       13% for most ASCs and 6.5% for the ones configured
+ *                       with an override. Zero premium earns zero.
+ *
+ * Then, per ASC per month:
+ *   Taxable        = sum of all frame totals   (decimals kept)
+ *   SGST + CGST    = 9% each of Taxable
+ *   Invoice Amount = round(Taxable x 1.18)     (whole rupees — this is the
+ *                    figure the ASC's tax invoice must show)
+ *
+ * Rounding happens ONCE, on the final invoice amount. Rounding each frame
+ * would drift away from the ASC's own arithmetic by a few rupees a month.
+ *
+ * ---------------------------------------------------------------------
+ * WHERE THE DATA COMES FROM
+ * ---------------------------------------------------------------------
+ *   Vehicle_Sale_Review_Queue   Status = 'Submitted' only. Registration and
+ *   (per invoice)               Insurance figures live here, entered by the
+ *                               Network Manager. 'Pending' rows haven't been
+ *                               filled in yet; 'Cancelled' rows are excluded
+ *                               automatically, which is why cancelled sales
+ *                               need no special handling anywhere below.
+ *   Vehicle_Sale_Detail         Frame No and Model Variant, Source = 'ASC'.
+ *   (per frame)
+ *
+ * A frame belongs to a month by its INVOICE DATE, never by when it was
+ * imported — a late import lands in the month it was actually sold in.
+ *
+ * ---------------------------------------------------------------------
+ * THE LIFECYCLE, AND WHY IT IS ONE-WAY
+ * ---------------------------------------------------------------------
+ *   Generated -> Invoice Requested -> Invoice Uploaded -> Posted
+ *
+ * Regeneration is permitted ONLY in Generated. The moment an ASC has been
+ * asked for an invoice, the figures it is invoicing against must stop moving
+ * underneath it. And once Posted, the month is closed permanently: a frame
+ * that arrives afterwards is ignored rather than quietly reopening a month
+ * that Accounts has already put through Tally.
+ * ---------------------------------------------------------------------
  */
 
-function addCommissionRule(token, rule) {
-  return safeRun('addCommissionRule', function () {
-    var session = requireRole_(token, PERMISSIONS.Commission.edit);
-    requireFields(rule, ['Vehicle Model', 'Commission Type', 'Rate', 'Effective Date']);
-    if (['Fixed', 'Percentage'].indexOf(rule['Commission Type']) === -1) {
-      throw new Error('Commission Type must be Fixed or Percentage.');
+// ============================================================ COLLECTION =
+/**
+ * Every commissionable frame for one ASC in one month, already priced.
+ * Returns { lines, missingVariants, multiFrameInvoices }.
+ *
+ * missingVariants is the important output: any frame whose Model Variant has
+ * no rate on file yet is reported rather than silently priced at zero. That
+ * single behaviour is what the month-start checkpoint is built around.
+ */
+function collectCommissionLines_(dealerCode, month, rateMap) {
+  var queueRows = getAllRows(SHEETS.VEHICLE_SALE_REVIEW_QUEUE).filter(function (q) {
+    if (String(q['Dealer Code']) !== String(dealerCode)) return false;
+    if (String(q.Status) !== 'Submitted') return false;
+    if (!q['Invoice Date']) return false;
+    return Utilities.formatDate(parseInvoiceDate_(q['Invoice Date']), 'Asia/Kolkata', 'yyyy-MM') === month;
+  });
+
+  var allDetail = getAllRows(SHEETS.VEHICLE_SALE_DETAIL);
+  var detailByInvoice = {};
+  allDetail.forEach(function (d) {
+    if (String(d.Source) !== 'ASC') return;
+    if (String(d['Dealer Code']) !== String(dealerCode)) return;
+    var inv = String(d['Invoice No']);
+    if (!detailByInvoice[inv]) detailByInvoice[inv] = [];
+    detailByInvoice[inv].push(d);
+  });
+
+  var regCommission = lookupCommissionConfig_(COMMISSION_CONFIG_KEYS.REGISTRATION_COMMISSION, dealerCode, 500);
+  var insPct = lookupCommissionConfig_(COMMISSION_CONFIG_KEYS.INSURANCE_COMMISSION_PCT, dealerCode, 13);
+
+  var lines = [];
+  var missingVariants = {};
+  var multiFrameInvoices = [];
+
+  queueRows.forEach(function (q) {
+    var invoiceNo = String(q['Invoice No']);
+    var frames = detailByInvoice[invoiceNo] || [];
+    if (frames.length === 0) return; // submitted review with no frame detail — nothing to price
+    if (frames.length > 1) multiFrameInvoices.push(invoiceNo);
+
+    var invoiceDate = parseInvoiceDate_(q['Invoice Date']);
+    var isPermanent = String(q['Registration Type']).trim() === COMMISSION_REGISTRATION_TYPE;
+    var insuranceAmount = parseAmount_(q['Insurance Amount']);
+
+    frames.forEach(function (f, idx) {
+      var variant = f['Model Variant'];
+      var vehicleCom = lookupCommissionRate_(variant, rateMap);
+      if (vehicleCom === null) {
+        missingVariants[String(variant || '(blank)')] = true;
+      }
+
+      // ASC invoices carry exactly one frame, which is why registration and
+      // insurance can map straight onto it. The idx === 0 guard only matters
+      // if that ever stops being true: registration and insurance are invoice
+      // level figures, so they must not be counted once per frame.
+      var thisReg = (isPermanent && idx === 0) ? Number(regCommission) : 0;
+      var thisInsBase = (idx === 0 && insuranceAmount > 0) ? (insuranceAmount / INSURANCE_GST_DIVISOR) : 0;
+      var thisInsCom = thisInsBase * (Number(insPct) / 100);
+
+      var vc = vehicleCom === null ? 0 : vehicleCom;
+      lines.push({
+        invoiceNo: invoiceNo,
+        invoiceDate: invoiceDate,
+        frameNo: f['Frame No'] || '',
+        modelVariant: variant || '',
+        customerName: q['Customer Name'] || f['Customer Name'] || '',
+        vehicleCom: vc,
+        registrationType: q['Registration Type'] || '',
+        registrationAmount: parseAmount_(q['Registration Amount']),
+        regCom: thisReg,
+        insuranceAmount: (idx === 0 ? insuranceAmount : 0),
+        insRatePct: Number(insPct),
+        insCom: thisInsCom,
+        lineTotal: vc + thisReg + thisInsCom,
+        rateMissing: vehicleCom === null
+      });
+    });
+  });
+
+  lines.sort(function (a, b) { return a.invoiceDate - b.invoiceDate; });
+
+  return {
+    lines: lines,
+    missingVariants: Object.keys(missingVariants).sort(),
+    multiFrameInvoices: multiFrameInvoices
+  };
+}
+
+/** Rolls priced lines up into the invoice-level figures. Rounding happens here and nowhere else. */
+function summariseCommissionLines_(lines, dealerCode) {
+  var sgstPct = lookupCommissionConfig_(COMMISSION_CONFIG_KEYS.SGST_PCT, dealerCode, 9);
+  var cgstPct = lookupCommissionConfig_(COMMISSION_CONFIG_KEYS.CGST_PCT, dealerCode, 9);
+
+  var vehicleCom = 0, regCom = 0, insCom = 0;
+  lines.forEach(function (l) {
+    vehicleCom += l.vehicleCom;
+    regCom += l.regCom;
+    insCom += l.insCom;
+  });
+  var taxable = vehicleCom + regCom + insCom;
+  var sgst = taxable * (Number(sgstPct) / 100);
+  var cgst = taxable * (Number(cgstPct) / 100);
+
+  return {
+    frameCount: lines.length,
+    vehicleCom: round2_(vehicleCom),
+    regCom: round2_(regCom),
+    insCom: round2_(insCom),
+    taxable: round2_(taxable),
+    sgst: round2_(sgst),
+    cgst: round2_(cgst),
+    invoiceAmount: Math.round(taxable + sgst + cgst)
+  };
+}
+
+function round2_(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+// ============================================================ CHECKPOINT =
+/**
+ * The 1st-of-month readiness check. For every active ASC it answers: how many
+ * frames are waiting, which Model Variants still have no rate, and whether a
+ * report already exists.
+ *
+ * A blocked ASC blocks only itself — every other ASC still generates on the
+ * 2nd. Blocking the whole network because one variant is missing would punish
+ * dealers who have nothing to do with it.
+ */
+function runCommissionCheckpoint(token, month) {
+  return safeRun('runCommissionCheckpoint', function () {
+    requireRole_(token, PERMISSIONS.Commission.generate);
+    requireCommissionMonth_(month);
+    return commissionCheckpoint_(month);
+  });
+}
+
+function commissionCheckpoint_(month) {
+  var rateMap = buildCommissionRateMap_();
+  var ascDealers = getAllRows(SHEETS.DEALER_MASTER).filter(function (d) {
+    return String(d.Type) === DEALER_TYPES.ASC && String(d.Status) !== 'Inactive';
+  });
+  var existingReports = getAllRows(SHEETS.COMMISSION_REPORT).filter(function (r) { return String(r.Month) === month; });
+
+  return ascDealers.map(function (d) {
+    var dealerCode = d['Dealer Code'];
+    var collected = collectCommissionLines_(dealerCode, month, rateMap);
+    var summary = summariseCommissionLines_(collected.lines, dealerCode);
+    var report = null;
+    for (var i = 0; i < existingReports.length; i++) {
+      if (String(existingReports[i]['Dealer Code']) === String(dealerCode)) { report = existingReports[i]; break; }
     }
-    rule['Created By'] = session.username;
-    appendRow(SHEETS.COMMISSION_MASTER, rule, session.username);
+    return {
+      dealerCode: dealerCode,
+      dealerName: d['Dealer Name'],
+      frameCount: collected.lines.length,
+      missingVariants: collected.missingVariants,
+      multiFrameInvoices: collected.multiFrameInvoices,
+      ready: collected.missingVariants.length === 0 && collected.lines.length > 0,
+      previewInvoiceAmount: summary.invoiceAmount,
+      reportId: report ? report['Report ID'] : '',
+      reportStatus: report ? report.Status : '',
+      canGenerate: !report || String(report.Status) === COMMISSION_STATUS.GENERATED
+    };
+  });
+}
+
+// ============================================================== GENERATE =
+/**
+ * Builds (or rebuilds) one ASC's report for one month.
+ *
+ * Rebuilding deletes the previous lines rather than layering new ones on top,
+ * so the report is always a clean snapshot of the data as it stands right now.
+ * It is refused outright once the ASC has been asked for an invoice.
+ */
+function generateCommissionReport(token, dealerCode, month) {
+  return safeRun('generateCommissionReport', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.generate);
+    requireCommissionMonth_(month);
+
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      return generateCommissionReport_(dealerCode, month, session.username);
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+function generateCommissionReport_(dealerCode, month, actor) {
+  var dealer = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', dealerCode);
+  if (!dealer) throw new Error('Dealer not found: ' + dealerCode);
+  if (String(dealer.Type) !== DEALER_TYPES.ASC) {
+    throw new Error('Commission applies to ASC dealers only. ' + dealerCode + ' is type ' + dealer.Type + '.');
+  }
+
+  var existing = findCommissionReport_(dealerCode, month);
+  if (existing && String(existing.Status) !== COMMISSION_STATUS.GENERATED) {
+    throw new Error('This month is already at "' + existing.Status + '" for ' + dealerCode + ' and can no longer be regenerated.');
+  }
+
+  var collected = collectCommissionLines_(dealerCode, month, buildCommissionRateMap_());
+  if (collected.missingVariants.length > 0) {
+    throw new Error('Commission rate missing for: ' + collected.missingVariants.join(', ') +
+      '. Add the rate(s) in Commission Rates first, then generate again.');
+  }
+  if (collected.lines.length === 0) {
+    throw new Error('No submitted ASC vehicle sales found for ' + dealerCode + ' in ' + month + '.');
+  }
+
+  // Clean rebuild: drop the old snapshot entirely before writing the new one.
+  if (existing) {
+    var oldLines = findRows(SHEETS.COMMISSION_REPORT_LINE, { 'Report ID': existing['Report ID'] });
+    if (oldLines.length) deleteRowsWhere_(SHEETS.COMMISSION_REPORT_LINE, oldLines);
+    deleteRowsWhere_(SHEETS.COMMISSION_REPORT, [existing]);
+  }
+
+  var summary = summariseCommissionLines_(collected.lines, dealerCode);
+  var reportId = generateId('CMR');
+
+  appendRow(SHEETS.COMMISSION_REPORT, {
+    'Report ID': reportId,
+    'Dealer Code': dealerCode,
+    'Month': month,
+    'Status': COMMISSION_STATUS.GENERATED,
+    'Frame Count': summary.frameCount,
+    'Vehicle Com': summary.vehicleCom,
+    'Reg Com': summary.regCom,
+    'Ins Com': summary.insCom,
+    'Taxable': summary.taxable,
+    'SGST': summary.sgst,
+    'CGST': summary.cgst,
+    'Invoice Amount': summary.invoiceAmount,
+    'Generated On': new Date(),
+    'Generated By': actor,
+    'Remarks': existing ? 'Regenerated' : ''
+  }, actor);
+
+  appendRows(SHEETS.COMMISSION_REPORT_LINE, collected.lines.map(function (l) {
+    return {
+      'Line ID': generateId('CML'),
+      'Report ID': reportId,
+      'Dealer Code': dealerCode,
+      'Month': month,
+      'Invoice No': l.invoiceNo,
+      'Invoice Date': l.invoiceDate,
+      'Frame No': l.frameNo,
+      'Model Variant': l.modelVariant,
+      'Customer Name': l.customerName,
+      'Vehicle Com': l.vehicleCom,
+      'Registration Type': l.registrationType,
+      'Registration Amount': l.registrationAmount,
+      'Reg Com': l.regCom,
+      'Insurance Amount': l.insuranceAmount,
+      'Ins Rate %': l.insRatePct,
+      'Ins Com': round2_(l.insCom),
+      'Line Total': round2_(l.lineTotal),
+      'Created On': new Date()
+    };
+  }), actor);
+
+  return { reportId: reportId, dealerCode: dealerCode, month: month, regenerated: !!existing, summary: summary };
+}
+
+/** Generates for every ASC that the checkpoint says is ready. Used by the "Generate all" button and the monthly trigger. */
+function generateAllCommissionReports(token, month) {
+  return safeRun('generateAllCommissionReports', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.generate);
+    requireCommissionMonth_(month);
+    return generateAllCommissionReports_(month, session.username);
+  });
+}
+
+function generateAllCommissionReports_(month, actor) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var checkpoint = commissionCheckpoint_(month);
+    var results = [];
+    checkpoint.forEach(function (c) {
+      if (!c.ready || !c.canGenerate) {
+        results.push({
+          dealerCode: c.dealerCode,
+          dealerName: c.dealerName,
+          done: false,
+          reason: c.frameCount === 0 ? 'No sales this month'
+            : (c.missingVariants.length ? 'Missing rate: ' + c.missingVariants.join(', ')
+            : 'Already at ' + c.reportStatus)
+        });
+        return;
+      }
+      try {
+        var r = generateCommissionReport_(c.dealerCode, month, actor);
+        results.push({ dealerCode: c.dealerCode, dealerName: c.dealerName, done: true, invoiceAmount: r.summary.invoiceAmount });
+      } catch (err) {
+        results.push({ dealerCode: c.dealerCode, dealerName: c.dealerName, done: false, reason: err.message });
+      }
+    });
+    return results;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ================================================================ LISTING =
+/**
+ * Reports for a month (or all months if month is blank).
+ *
+ * A Dealer sees only its own, and only once an invoice has actually been
+ * requested — showing an ASC a figure still under internal review would invite
+ * arguments about numbers that are not final yet.
+ */
+function listCommissionReports(token, month) {
+  return safeRun('listCommissionReports', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.view);
+    var rows = getAllRows(SHEETS.COMMISSION_REPORT);
+    if (month) rows = rows.filter(function (r) { return String(r.Month) === month; });
+
+    if (session.role === ROLES.DEALER) {
+      rows = rows.filter(function (r) {
+        return String(r['Dealer Code']) === String(session.dealerCode) &&
+          String(r.Status) !== COMMISSION_STATUS.GENERATED;
+      });
+    }
+
+    var names = getDealerNameMap_();
+    return rows.map(function (r) {
+      var out = {};
+      Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+      out['Dealer Name'] = names[r['Dealer Code']] || '';
+      out.aging = commissionAging_(r);
+      return out;
+    }).sort(function (a, b) {
+      if (a.Month !== b.Month) return a.Month < b.Month ? 1 : -1;
+      return String(a['Dealer Name']) < String(b['Dealer Name']) ? -1 : 1;
+    });
+  });
+}
+
+/**
+ * Three separate clocks, because they answer three different questions:
+ *   pendingDays  how long the ASC has been sitting on an invoice request
+ *   uploadDays   how long it took them, once they did upload
+ *   verifyDays   how long Accounts then took to verify it
+ */
+function commissionAging_(r) {
+  var requested = r['Invoice Requested On'] ? new Date(r['Invoice Requested On']) : null;
+  var uploaded = r['Uploaded On'] ? new Date(r['Uploaded On']) : null;
+  var verified = r['Verified On'] ? new Date(r['Verified On']) : null;
+  return {
+    pendingDays: (requested && !uploaded) ? daysBetween_(requested, new Date()) : null,
+    uploadDays: (requested && uploaded) ? daysBetween_(requested, uploaded) : null,
+    verifyDays: (uploaded && verified) ? daysBetween_(uploaded, verified) : null
+  };
+}
+
+function daysBetween_(from, to) {
+  return Math.max(0, Math.floor((to - from) / (1000 * 60 * 60 * 24)));
+}
+
+/** Header plus every frame line — the detail screen and the ASC's own view. */
+function getCommissionReportDetail(token, reportId) {
+  return safeRun('getCommissionReportDetail', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.view);
+    var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+    if (!report) throw new Error('Report not found: ' + reportId);
+    if (session.role === ROLES.DEALER) {
+      if (String(report['Dealer Code']) !== String(session.dealerCode)) {
+        throw new Error('You can only view your own commission reports.');
+      }
+      if (String(report.Status) === COMMISSION_STATUS.GENERATED) {
+        throw new Error('This report is still under review and is not available yet.');
+      }
+    }
+    var lines = findRows(SHEETS.COMMISSION_REPORT_LINE, { 'Report ID': reportId })
+      .sort(function (a, b) { return parseInvoiceDate_(a['Invoice Date']) - parseInvoiceDate_(b['Invoice Date']); });
+    var names = getDealerNameMap_();
+    var header = {};
+    Object.keys(report).forEach(function (k) { header[k] = report[k]; });
+    header['Dealer Name'] = names[report['Dealer Code']] || '';
+    header.aging = commissionAging_(report);
+    return { report: header, lines: lines };
+  });
+}
+
+// ====================================================== INVOICE WORKFLOW =
+/** Hands the report to the ASC: from here the figures are frozen and the ASC can see them. */
+function requestCommissionInvoice(token, reportId) {
+  return safeRun('requestCommissionInvoice', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.request);
+    var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+    if (!report) throw new Error('Report not found: ' + reportId);
+    if (String(report.Status) !== COMMISSION_STATUS.GENERATED) {
+      throw new Error('Invoice can only be requested for a report in "' + COMMISSION_STATUS.GENERATED + '" status. This one is "' + report.Status + '".');
+    }
+    updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
+      'Status': COMMISSION_STATUS.INVOICE_REQUESTED,
+      'Invoice Requested On': new Date(),
+      'Invoice Requested By': session.username
+    }, session.username);
+
+    appendRow(SHEETS.NOTIFICATION_LOG, {
+      'Dealer Code': report['Dealer Code'],
+      'Type': 'Commission Invoice Requested',
+      'Message': 'Commission for ' + report.Month + ' is ready: ' + formatCurrency(report['Invoice Amount']) +
+        '. Please raise your tax invoice for this amount and upload it in the Commission tab.',
+      'Timestamp': new Date(),
+      'Read Status': false
+    }, session.username);
+
     return true;
   });
 }
 
-function listCommissionRules(token) {
-  return safeRun('listCommissionRules', function () {
-    requireRole_(token, PERMISSIONS.Commission.view);
-    return getAllRows(SHEETS.COMMISSION_MASTER);
+/**
+ * The ASC uploads its tax invoice.
+ *
+ * The amount must match to the rupee. Confirmed as the intended rule: a
+ * mismatch means the invoice itself is wrong and has to be reissued, so
+ * accepting it here would just push a reconciliation problem into Tally.
+ */
+function uploadCommissionInvoice(token, reportId, invoiceNo, invoiceDate, amount, attachmentLink) {
+  return safeRun('uploadCommissionInvoice', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.upload);
+
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+      if (!report) throw new Error('Report not found: ' + reportId);
+      if (session.role === ROLES.DEALER && String(report['Dealer Code']) !== String(session.dealerCode)) {
+        throw new Error('You can only upload an invoice for your own commission report.');
+      }
+      if (String(report.Status) !== COMMISSION_STATUS.INVOICE_REQUESTED) {
+        throw new Error('This report is at "' + report.Status + '" — an invoice cannot be uploaded now.');
+      }
+      if (!isNonEmpty(invoiceNo)) throw new Error('Invoice number is required.');
+      if (!isNonEmpty(invoiceDate)) throw new Error('Invoice date is required.');
+      if (!isNonEmpty(attachmentLink)) throw new Error('A copy of the tax invoice is required.');
+
+      var expected = Number(report['Invoice Amount']);
+      var given = Math.round(Number(amount) || 0);
+      if (given !== expected) {
+        throw new Error('Invoice amount ' + formatCurrency(given) + ' does not match the calculated amount ' +
+          formatCurrency(expected) + '. Please correct the invoice and upload again.');
+      }
+
+      updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
+        'Status': COMMISSION_STATUS.INVOICE_UPLOADED,
+        'ASC Invoice No': sanitizeString(invoiceNo),
+        'ASC Invoice Date': parseInvoiceDate_(invoiceDate),
+        'ASC Invoice Amount': given,
+        'Attachment Link': attachmentLink,
+        'Uploaded On': new Date(),
+        'Uploaded By': session.username
+      }, session.username);
+      return true;
+    } finally {
+      lock.releaseLock();
+    }
   });
 }
 
-function calculateCommission(token, dealerCode, month) {
-  return safeRun('calculateCommission', function () {
-    var session = requireRole_(token, [ROLES.ADMIN, ROLES.ACCOUNTS]);
-    if (!findRow(SHEETS.DEALER_MASTER, 'Dealer Code', dealerCode)) {
-      throw new Error('Dealer not found: ' + dealerCode);
-    }
-    if (!/^\d{4}-\d{2}$/.test(month || '')) {
-      throw new Error('Month must be in YYYY-MM format, e.g. 2026-07.');
-    }
-    if (findRows(SHEETS.COMMISSION_ENTRIES, { 'Dealer Code': dealerCode, 'Month': month }).length > 0) {
-      throw new Error('Commission for ' + dealerCode + ' / ' + month + ' has already been calculated.');
-    }
-    var rules = getAllRows(SHEETS.COMMISSION_MASTER)
-      .filter(function (r) { return new Date(r['Effective Date']) <= new Date(); })
-      .sort(function (a, b) { return new Date(b['Effective Date']) - new Date(a['Effective Date']); });
-    if (rules.length === 0) throw new Error('No Commission Master rule found. Add one first.');
-    var rule = rules[0];
+/**
+ * Accounts/Admin confirm the invoice went into Tally, and the amount lands in
+ * the ASC's ledger as a Credit dated with the TALLY entry date — not today —
+ * so the portal ledger and Tally agree on when it happened.
+ *
+ * This is the point of no return: the month is locked afterwards.
+ */
+function verifyCommissionInvoice(token, reportId, tallyEntryDate, remarks) {
+  return safeRun('verifyCommissionInvoice', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.verify);
 
-    var vehicleSales = findRows(SHEETS.LEDGER_TRANSACTIONS, { 'Dealer Code': dealerCode, 'Head': 'Vehicle Sale' })
-      .filter(function (r) { return Utilities.formatDate(new Date(r.Date), 'Asia/Kolkata', 'yyyy-MM') === month; });
+    // Same reasoning as approvePayment: two fast clicks must not both see
+    // "Invoice Uploaded" and both post a ledger credit.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+      if (!report) throw new Error('Report not found: ' + reportId);
+      if (String(report.Status) !== COMMISSION_STATUS.INVOICE_UPLOADED) {
+        throw new Error('Only an uploaded invoice can be verified. This report is at "' + report.Status + '".');
+      }
+      if (!isNonEmpty(tallyEntryDate)) throw new Error('Tally entry date is required.');
 
-    var retailCount = vehicleSales.length;
-    var totalSaleAmount = vehicleSales.reduce(function (sum, r) { return sum + Number(r.Debit || 0); }, 0);
-    var amount = rule['Commission Type'] === 'Fixed'
-      ? retailCount * Number(rule.Rate)
-      : totalSaleAmount * (Number(rule.Rate) / 100);
-    amount = Math.round(amount * 100) / 100;
-
-    if (amount > 0) {
-      appendRow(SHEETS.COMMISSION_ENTRIES, {
-        'Entry ID': generateId('COM'),
-        'Dealer Code': dealerCode,
-        'Month': month,
-        'Model': rule['Vehicle Model'],
-        'Retail Count': retailCount,
-        'Amount': amount,
-        'Created On': new Date()
-      }, session.username);
+      var entryDate = parseInvoiceDate_(tallyEntryDate);
+      var entryId = generateId('LED');
+      var amount = Number(report['Invoice Amount']);
 
       appendRow(SHEETS.LEDGER_TRANSACTIONS, {
-        'Entry ID': generateId('LED'),
-        'Date': new Date(),
-        'Invoice No': '',
-        'Head': 'Commission',
-        'Dealer Code': dealerCode,
+        'Entry ID': entryId,
+        'Date': entryDate,
+        'Invoice No': report['ASC Invoice No'] || '',
+        'Head': COMMISSION_LEDGER_HEAD,
+        'Dealer Code': report['Dealer Code'],
         'Debit': 0,
         'Credit': amount,
         'Running Balance': 0,
-        'Remarks': 'Commission for ' + month + ' (' + retailCount + ' retail)',
+        'Remarks': 'Network commission ' + report.Month + ' (invoice ' + (report['ASC Invoice No'] || '-') + ')',
         'Created By': session.username,
-        'Timestamp': new Date()
+        'Timestamp': new Date(),
+        'Invoice Date': report['ASC Invoice Date'] || entryDate
       }, session.username);
-      recomputeRunningBalance_(dealerCode);
+      recomputeRunningBalance_(report['Dealer Code']);
+
+      updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
+        'Status': COMMISSION_STATUS.POSTED,
+        'Tally Entry Date': entryDate,
+        'Verified By': session.username,
+        'Verified On': new Date(),
+        'Ledger Entry ID': entryId,
+        'Remarks': remarks || report.Remarks || ''
+      }, session.username);
+
+      return { ledgerEntryId: entryId, amount: amount };
+    } finally {
+      lock.releaseLock();
     }
-    return { retailCount: retailCount, amount: amount };
   });
 }
 
-function listCommissionEntries(token, dealerCode) {
-  return safeRun('listCommissionEntries', function () {
-    var session = requireRole_(token, PERMISSIONS.Commission.view);
-    if (session.role === ROLES.DEALER && session.dealerCode !== dealerCode) {
-      throw new Error('You can only view your own commission entries.');
+// ================================================================ HELPERS =
+function requireCommissionMonth_(month) {
+  if (!/^\d{4}-\d{2}$/.test(month || '')) {
+    throw new Error('Month must be in YYYY-MM format, e.g. 2026-07.');
+  }
+}
+
+function findCommissionReport_(dealerCode, month) {
+  var rows = getAllRows(SHEETS.COMMISSION_REPORT);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i]['Dealer Code']) === String(dealerCode) && String(rows[i].Month) === month) return rows[i];
+  }
+  return null;
+}
+
+/** YYYY-MM of the month before the given date (defaults to today). */
+function previousMonthKey_(from) {
+  var d = from ? new Date(from) : new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM');
+}
+
+// =============================================================== TRIGGERS =
+/**
+ * Run ONCE from the Apps Script editor. Sets the monthly rhythm:
+ *   1st, 09:00 — checkpoint. Anything missing is raised to Admin and the
+ *                Network Manager while there is still a day to fix it.
+ *   2nd, 09:00 — generate every ASC that came out of the checkpoint clean.
+ * Safe to re-run: it clears its own previous triggers first.
+ */
+function setupCommissionTriggers() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var fn = t.getHandlerFunction();
+    if (fn === 'scheduledCommissionCheckpoint_' || fn === 'scheduledCommissionGenerate_') {
+      ScriptApp.deleteTrigger(t);
     }
-    return findRows(SHEETS.COMMISSION_ENTRIES, { 'Dealer Code': dealerCode });
   });
+  ScriptApp.newTrigger('scheduledCommissionCheckpoint_').timeBased().onMonthDay(1).atHour(9).create();
+  ScriptApp.newTrigger('scheduledCommissionGenerate_').timeBased().onMonthDay(2).atHour(9).create();
+  Logger.log('Commission triggers set: checkpoint on the 1st at 09:00, generation on the 2nd at 09:00.');
+}
+
+/**
+ * Notifies about last month's blockers. Notifications are written against the
+ * blocked ASC's own Dealer Code so the dealer-wise view stays coherent — but
+ * only Admin, Accounts and Network Manager can read Notification_Log for
+ * dealers other than their own, so this does not leak to the ASC.
+ */
+function scheduledCommissionCheckpoint_() {
+  var month = previousMonthKey_();
+  var checkpoint = commissionCheckpoint_(month);
+  var blocked = checkpoint.filter(function (c) { return c.missingVariants.length > 0; });
+  if (blocked.length === 0) {
+    Logger.log('Commission checkpoint ' + month + ': all ASCs clear.');
+    return;
+  }
+  blocked.forEach(function (c) {
+    appendRow(SHEETS.NOTIFICATION_LOG, {
+      'Dealer Code': c.dealerCode,
+      'Type': 'Commission Rate Missing',
+      'Message': c.dealerName + ' (' + c.dealerCode + ') cannot be generated for ' + month +
+        ' — no commission rate on file for: ' + c.missingVariants.join(', ') +
+        '. Add the rate(s) in Commission Rates, then use Generate now.',
+      'Timestamp': new Date(),
+      'Read Status': false
+    }, 'System');
+  });
+  logAction('System', 'COMMISSION CHECKPOINT ' + month, '',
+    blocked.length + ' ASC(s) blocked: ' + blocked.map(function (c) { return c.dealerCode; }).join(', '));
+}
+
+function scheduledCommissionGenerate_() {
+  var month = previousMonthKey_();
+  var results = generateAllCommissionReports_(month, 'System (Scheduled)');
+  Logger.log('Commission generation ' + month + ': ' + JSON.stringify(results));
 }

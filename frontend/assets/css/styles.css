@@ -54,3 +54,28 @@
   .frame-row input { flex: 1; }
   .frame-remove-btn { background:#f1f1f1; border:none; color:#c62828; font-weight:bold; width:26px; height:26px; min-width:26px; border-radius:50%; cursor:pointer; font-size:14px; line-height:1; }
   .frame-remove-btn:hover { background:#fdeaec; }
+
+/* ---- Commission tab bar ------------------------------------------------ */
+.tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid #e3e3e3;
+  margin-top: 4px;
+}
+.cm-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  border-radius: 0;
+}
+.cm-tab:hover { color: #222; }
+.cm-tab.active {
+  color: #c8102e;
+  border-bottom-color: #c8102e;
+  font-weight: 600;
+}

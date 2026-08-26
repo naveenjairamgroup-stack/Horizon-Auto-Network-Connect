@@ -132,7 +132,14 @@ function computeAscTotalAmount_(queueRow) {
 function listVehicleSaleReviews(token) {
   return safeRun('listVehicleSaleReviews', function () {
     requireRole_(token, PERMISSIONS.VehicleSaleReview.view);
+    var names = getDealerNameMap_();
     return getAllRows(SHEETS.VEHICLE_SALE_REVIEW_QUEUE)
+      .map(function (r) {
+        var out = {};
+        Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+        out['Dealer Name'] = names[r['Dealer Code']] || '';
+        return out;
+      })
       .sort(function (a, b) { return new Date(b['Submitted On'] || 0) - new Date(a['Submitted On'] || 0); });
   });
 }

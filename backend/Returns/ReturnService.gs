@@ -70,7 +70,13 @@ function listReturns(token, filterStatus) {
     if (filterStatus) {
       rows = rows.filter(function (r) { return r['Approval Status'] === filterStatus; });
     }
-    return rows.sort(function (a, b) { return new Date(b['Invoice Date']) - new Date(a['Invoice Date']); });
+    var names = getDealerNameMap_();
+    return rows.map(function (r) {
+      var out = {};
+      Object.keys(r).forEach(function (k) { out[k] = r[k]; });
+      out['Dealer Name'] = names[r['Dealer Code']] || '';
+      return out;
+    }).sort(function (a, b) { return new Date(b['Invoice Date']) - new Date(a['Invoice Date']); });
   });
 }
 

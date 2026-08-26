@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { formatMoney_, statusBadge_, showToast_ } from '../utils.js';
+import { formatMoney_, statusBadge_, showToast_, formatDateDisplay_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 export function loadPayments() {
@@ -14,8 +14,11 @@ export function loadPayments() {
         actionHtml = '<button onclick="handleApprovePayment(\'' + p['Payment ID'] + '\')">Approve</button> ' +
                      '<button onclick="handleRejectPayment(\'' + p['Payment ID'] + '\')">Reject</button>';
       }
-      tr.innerHTML = '<td>' + p['Dealer Code'] + '</td><td>' + p.Mode + '</td><td>' + formatMoney_(p.Amount) + '</td>' +
-        '<td>' + p.Date + '</td><td>' + statusBadge_(p['Approval Status']) + '</td><td>' + actionHtml + '</td>';
+      tr.innerHTML = '<td>' + esc_(p['Dealer Code']) + '</td><td>' + esc_(p['Dealer Name']) + '</td>' +
+        '<td>' + esc_(p.Mode) + '</td><td>' + formatMoney_(p.Amount) + '</td>' +
+        '<td>' + esc_(p['Reference No']) + '</td>' +
+        '<td>' + formatDateDisplay_(p.Date) + '</td>' +
+        '<td>' + statusBadge_(p['Approval Status']) + '</td><td>' + actionHtml + '</td>';
       tbody.appendChild(tr);
     });
   }).catch(function (err) { showToast_(err); });

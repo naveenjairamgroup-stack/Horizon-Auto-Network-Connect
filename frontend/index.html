@@ -293,7 +293,7 @@
 <div class="card">
   <h2>Payments</h2>
   <table>
-    <thead><tr><th>Dealer</th><th>Mode</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+    <thead><tr><th>Dealer code</th><th>Dealer name</th><th>Mode</th><th>Amount</th><th>Reference no.</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="payment-table-body"></tbody>
   </table>
 </div>
@@ -340,7 +340,7 @@
 <div class="card">
   <h2>Returns</h2>
   <table>
-    <thead><tr><th>Dealer</th><th>Type</th><th>Invoice</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+    <thead><tr><th>Dealer code</th><th>Dealer name</th><th>Type</th><th>Invoice</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="return-table-body"></tbody>
   </table>
 </div>
@@ -348,41 +348,175 @@
         </div>
         <div id="page-Commission" class="page">
 <div class="card">
-  <h2>Add commission rule</h2>
-  <form id="new-commission-rule-form">
+  <h2>Commission</h2>
+  <div class="tab-bar" id="cm-tab-bar">
+    <button type="button" class="cm-tab active" data-tab="reports" onclick="showCommissionTab('reports')">Reports</button>
+    <button type="button" class="cm-tab" data-tab="checkpoint" onclick="showCommissionTab('checkpoint')">Checkpoint</button>
+    <button type="button" class="cm-tab" data-tab="rates" onclick="showCommissionTab('rates')">Commission rates</button>
+    <button type="button" class="cm-tab" data-tab="settings" onclick="showCommissionTab('settings')">Settings</button>
+  </div>
+</div>
+
+<!-- ======================================================== REPORTS ==== -->
+<div class="cm-panel" id="cm-panel-reports">
+  <div class="card">
+    <h2>Commission reports</h2>
     <div class="form-row">
-      <div><label>Vehicle model</label><input id="cr-model" required></div>
-      <div>
-        <label>Type</label>
-        <select id="cr-type">
-          <option value="Fixed">Fixed (&#8377; per vehicle)</option>
-          <option value="Percentage">Percentage (of sale value)</option>
-        </select>
+      <div><label>Month (YYYY-MM)</label><input id="cm-report-month" placeholder="2026-07"></div>
+      <div style="align-self:flex-end;"><button type="button" onclick="loadCommissionReports()">Show</button></div>
+      <div style="align-self:flex-end;"><button type="button" onclick="loadCommissionReports(true)">Show all months</button></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th><th>Dealer code</th><th>Dealer name</th><th>Frames</th>
+          <th>Taxable</th><th>Invoice amount</th><th>Status</th><th>Aging</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="cm-report-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="cm-detail-card" style="display:none;">
+    <h2 id="cm-detail-title">Report detail</h2>
+    <div id="cm-detail-body"></div>
+    <button type="button" onclick="closeCommissionDetail()">Close</button>
+  </div>
+
+  <!-- ASC uploads its tax invoice here -->
+  <div class="card" id="cm-upload-card" style="display:none;">
+    <h2 id="cm-upload-title">Upload tax invoice</h2>
+    <p style="color:#888; font-size:12px;" id="cm-upload-hint"></p>
+    <form id="cm-upload-form">
+      <input type="hidden" id="cm-upload-report-id">
+      <div class="form-row">
+        <div><label>Invoice no.</label><input id="cm-upload-invoice-no" required></div>
+        <div><label>Invoice date</label><input id="cm-upload-invoice-date" type="date" required></div>
+        <div><label>Invoice amount (&#8377;)</label><input id="cm-upload-amount" type="number" step="1" required></div>
       </div>
-      <div><label>Rate</label><input id="cr-rate" type="number" step="0.01" required></div>
-      <div><label>Effective date</label><input id="cr-effective" type="date" required></div>
-    </div>
-    <button type="submit">Add rule</button>
-  </form>
+      <div class="form-row">
+        <div style="flex:2"><label>Tax invoice copy (mandatory)</label><input id="cm-upload-file" type="file" accept="image/*,.pdf" required></div>
+      </div>
+      <button type="submit">Upload invoice</button>
+      <button type="button" onclick="closeCommissionUpload()">Cancel</button>
+    </form>
+  </div>
+
+  <!-- Accounts/Admin confirm the Tally entry -->
+  <div class="card" id="cm-verify-card" style="display:none;">
+    <h2 id="cm-verify-title">Verify &amp; post to ledger</h2>
+    <p style="color:#888; font-size:12px;" id="cm-verify-hint"></p>
+    <form id="cm-verify-form">
+      <input type="hidden" id="cm-verify-report-id">
+      <div class="form-row">
+        <div><label>Tally entry date</label><input id="cm-verify-tally-date" type="date" required></div>
+        <div style="flex:2"><label>Remarks</label><input id="cm-verify-remarks"></div>
+      </div>
+      <button type="submit">Confirm &amp; post</button>
+      <button type="button" onclick="closeCommissionVerify()">Cancel</button>
+    </form>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Calculate monthly commission</h2>
-  <form id="calc-commission-form">
+<!-- ===================================================== CHECKPOINT ==== -->
+<div class="cm-panel" id="cm-panel-checkpoint" style="display:none;">
+  <div class="card">
+    <h2>Month checkpoint</h2>
+    <p style="color:#888; font-size:12px;">
+      Runs automatically on the 1st of each month; reports generate on the 2nd. Use this to check any month by hand.
+      An ASC with a missing commission rate is blocked on its own — every other ASC still generates.
+    </p>
     <div class="form-row">
-      <div><label>Dealer code</label><input id="cc-dealer-code" required></div>
-      <div><label>Month (YYYY-MM)</label><input id="cc-month" placeholder="2026-07" required></div>
+      <div><label>Month (YYYY-MM)</label><input id="cm-checkpoint-month" placeholder="2026-07"></div>
+      <div style="align-self:flex-end;"><button type="button" onclick="runCommissionCheckpointNow()">Run checkpoint</button></div>
+      <div style="align-self:flex-end;"><button type="button" onclick="generateAllCommission()">Generate all ready</button></div>
     </div>
-    <button type="submit">Calculate &amp; post to ledger</button>
-  </form>
+    <div id="cm-checkpoint-result"></div>
+  </div>
 </div>
 
-<div class="card">
-  <h2>Commission entries for this dealer</h2>
-  <table>
-    <thead><tr><th>Dealer</th><th>Month</th><th>Retail count</th><th>Amount</th></tr></thead>
-    <tbody id="commission-table-body"></tbody>
-  </table>
+<!-- ========================================================== RATES ==== -->
+<div class="cm-panel" id="cm-panel-rates" style="display:none;">
+  <div class="card">
+    <h2>Commission rates</h2>
+    <p style="color:#888; font-size:12px;">
+      Rate per Model Variant, with effect from a date. Editing never overwrites: it saves a new rate from the date you choose,
+      and the old one stays visible under History. The rate currently in force is the one shown below.
+    </p>
+    <div id="cm-pin-bar" style="margin-bottom:12px;"></div>
+    <div class="form-row">
+      <div style="flex:2"><label>Search variant</label><input id="cm-rate-search" placeholder="e.g. ACTIVA" oninput="renderCommissionRates()"></div>
+      <div style="align-self:flex-end;"><button type="button" id="cm-add-rate-btn" onclick="openCommissionRateForm('')">+ Add model</button></div>
+    </div>
+    <table>
+      <thead><tr><th>Model variant</th><th>Commission</th><th>w.e.f.</th><th>Updated by</th><th>History</th><th>Action</th></tr></thead>
+      <tbody id="cm-rate-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="cm-rate-form-card" style="display:none;">
+    <h2 id="cm-rate-form-title">Add model</h2>
+    <form id="cm-rate-form">
+      <div class="form-row">
+        <div style="flex:2"><label>Model variant</label><input id="cm-rate-variant" required></div>
+        <div><label>Commission (&#8377;)</label><input id="cm-rate-amount" type="number" step="0.01" required></div>
+        <div><label>Effective from</label><input id="cm-rate-effective" type="date" required></div>
+      </div>
+      <button type="submit">Save rate</button>
+      <button type="button" onclick="closeCommissionRateForm()">Cancel</button>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================= SETTINGS ==== -->
+<div class="cm-panel" id="cm-panel-settings" style="display:none;">
+  <div class="card">
+    <h2>Commission settings</h2>
+    <p style="color:#888; font-size:12px;">
+      Admin only. Registration is a flat amount paid only on Permanent Registration. Insurance % applies to the
+      GST-exclusive premium; add a dealer code to give one ASC a different rate.
+    </p>
+    <table>
+      <thead><tr><th>Setting</th><th>Default</th><th>Per-dealer overrides</th></tr></thead>
+      <tbody id="cm-config-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="cm-config-form-card">
+    <h2>Change a setting</h2>
+    <form id="cm-config-form">
+      <div class="form-row">
+        <div>
+          <label>Setting</label>
+          <select id="cm-config-key">
+            <option value="REGISTRATION_COMMISSION">Registration commission (&#8377;)</option>
+            <option value="INSURANCE_COMMISSION_PCT">Insurance commission (%)</option>
+            <option value="SGST_PCT">SGST (%)</option>
+            <option value="CGST_PCT">CGST (%)</option>
+          </select>
+        </div>
+        <div><label>Dealer code (blank = all dealers)</label><input id="cm-config-scope" placeholder="e.g. JH11AD02"></div>
+        <div><label>Value</label><input id="cm-config-value" type="number" step="0.01" required></div>
+        <div><label>Effective from</label><input id="cm-config-effective" type="date" required></div>
+      </div>
+      <button type="submit">Save setting</button>
+    </form>
+  </div>
+
+  <div class="card" id="cm-pin-admin-card">
+    <h2>Commission PIN</h2>
+    <p style="color:#888; font-size:12px;">
+      Admin only. Required by Admin, Accounts and Network Manager before editing any commission rate.
+      One PIN for everyone; entering it unlocks editing for 10 minutes. Setting a new PIN replaces the old one.
+    </p>
+    <form id="cm-pin-set-form">
+      <div class="form-row">
+        <div><label>New PIN (4&ndash;8 digits)</label><input id="cm-pin-new" type="password" inputmode="numeric" required></div>
+        <div><label>Confirm PIN</label><input id="cm-pin-confirm" type="password" inputmode="numeric" required></div>
+      </div>
+      <button type="submit">Set / reset PIN</button>
+    </form>
+  </div>
 </div>
 
         </div>
@@ -402,7 +536,7 @@
   <h2>ASC Vehicle Sale — Review Queue</h2>
   <p style="color:#888; font-size:12px;">Har invoice ke liye Registration/Insurance/EW/HPA bharkar submit karo — tabhi yeh Ledger mein post hoga. Submit karne ke 60 minute tak khud edit kar sakte ho.</p>
   <table>
-    <thead><tr><th>Dealer</th><th>Invoice</th><th>Customer</th><th>Model</th><th>Purchase Type</th><th>Status</th><th>Action</th></tr></thead>
+    <thead><tr><th>Dealer code</th><th>Dealer name</th><th>Invoice</th><th>Customer</th><th>Model</th><th>Purchase Type</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="vsr-table-body"></tbody>
   </table>
 </div>

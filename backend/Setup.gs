@@ -47,7 +47,34 @@ function setupDatabase() {
 
   seedVoucherHeads_();
   seedFirstAdmin_();
+  seedCommissionConfig_();
   Logger.log('Database setup complete.');
+}
+
+/**
+ * Seeds Commission_Config with the network-wide defaults so the commission
+ * calculation works the moment the first report is generated. These are
+ * ordinary editable rows, not code constants — Admin can change any of them
+ * from the Commission > Settings screen, and per-dealer overrides (e.g. the
+ * ASCs on 6.5% insurance instead of 13%) are added the same way.
+ *
+ * Only seeded when the tab is empty, so re-running setupDatabase() never
+ * overwrites values someone has since changed.
+ */
+function seedCommissionConfig_() {
+  var sheet = getSpreadsheet().getSheetByName(SHEETS.COMMISSION_CONFIG);
+  if (!sheet || sheet.getLastRow() > 1) return; // already seeded
+  var effective = new Date(2000, 0, 1); // far past, so it is in force immediately
+  [
+    [COMMISSION_CONFIG_KEYS.REGISTRATION_COMMISSION, '', 500],
+    [COMMISSION_CONFIG_KEYS.INSURANCE_COMMISSION_PCT, '', 13],
+    [COMMISSION_CONFIG_KEYS.SGST_PCT, '', 9],
+    [COMMISSION_CONFIG_KEYS.CGST_PCT, '', 9]
+  ].forEach(function (r) {
+    sheet.appendRow([r[0], r[1], r[2], effective, new Date(), 'System']);
+  });
+  Logger.log('Commission config seeded (registration 500, insurance 13%, SGST 9%, CGST 9%). ' +
+    'Add per-dealer insurance overrides from Commission > Settings.');
 }
 
 /**

@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { formatMoney_, statusBadge_, showToast_, readFileAsBase64_ } from '../utils.js';
+import { formatMoney_, statusBadge_, showToast_, readFileAsBase64_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 var frameInputCount = 1;
@@ -66,7 +66,8 @@ export function loadReturns() {
                      '<button onclick="handleRejectReturn(\'' + r['Return ID'] + '\')">Reject</button>';
       }
       var lateTag = String(r['Late Entry']) === 'true' ? ' <span class="badge badge-yellow">Late entry</span>' : '';
-      tr.innerHTML = '<td>' + r['Dealer Code'] + '</td><td>' + r['Return Type'] + '</td><td>' + r['Invoice No'] + lateTag + '</td>' +
+      tr.innerHTML = '<td>' + esc_(r['Dealer Code']) + '</td><td>' + esc_(r['Dealer Name']) + '</td>' +
+        '<td>' + esc_(r['Return Type']) + '</td><td>' + esc_(r['Invoice No']) + lateTag + '</td>' +
         '<td>' + formatMoney_(r['Total Amount']) + '</td><td>' + statusBadge_(r['Approval Status']) + '</td><td>' + actionHtml + '</td>';
       tbody.appendChild(tr);
     });

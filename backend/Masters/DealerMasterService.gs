@@ -45,6 +45,23 @@ function listDealers(token) {
   });
 }
 
+/**
+ * { 'JH11AD02': 'RAJ AUTOMOBILES', ... } — one lookup object built from a
+ * single (per-request cached) read of Dealer_Master.
+ *
+ * Payments, Returns, the Vehicle Sale review queue and Commission all store
+ * only a Dealer Code but need to SHOW a name. Doing the join here, server
+ * side, means one sheet read shared by every one of those callers instead of
+ * the frontend firing a second listDealers request per screen.
+ */
+function getDealerNameMap_() {
+  var map = {};
+  getAllRows(SHEETS.DEALER_MASTER).forEach(function (d) {
+    map[d['Dealer Code']] = d['Dealer Name'];
+  });
+  return map;
+}
+
 function getDealer(token, dealerCode) {
   return safeRun('getDealer', function () {
     var session = requireRole_(token, PERMISSIONS.DealerMaster.view.concat([ROLES.DEALER]));

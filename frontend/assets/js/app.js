@@ -26,7 +26,16 @@ import {
   handleSubmitReturn, handleApproveReturn, handleRejectReturn,
   onReturnTypeChange, addFrameNumberInput, removeFrameNumberInput
 } from './pages/returns.js';
-import { handleAddCommissionRule, handleCalculateCommission } from './pages/commission.js';
+import {
+  showCommissionTab, loadCommissionReports, openCommissionDetail, closeCommissionDetail,
+  regenerateCommission, requestCommissionInvoiceNow,
+  openCommissionUpload, closeCommissionUpload, handleCommissionUpload,
+  openCommissionVerify, closeCommissionVerify, handleCommissionVerify,
+  runCommissionCheckpointNow, generateOneCommission, generateAllCommission,
+  renderCommissionRates, openCommissionRateForm, closeCommissionRateForm,
+  handleSaveCommissionRate, showCommissionRateHistory, unlockCommissionPin,
+  handleSaveCommissionConfig, handleSetCommissionPin
+} from './pages/commission.js';
 import {
   openVehicleSaleReviewForm, closeVehicleSaleReviewForm, handleSubmitVehicleSaleReview,
   onRegistrationTypeChange, onInsuranceTypeChange, onEwTypeChange
@@ -61,6 +70,26 @@ window.onEwTypeChange = onEwTypeChange;
 window.handleAssignPartsSale = handleAssignPartsSale;
 window.handleImportNow = handleImportNow;
 
+// ---- Commission tab ----
+window.showCommissionTab = showCommissionTab;
+window.loadCommissionReports = loadCommissionReports;
+window.openCommissionDetail = openCommissionDetail;
+window.closeCommissionDetail = closeCommissionDetail;
+window.regenerateCommission = regenerateCommission;
+window.requestCommissionInvoiceNow = requestCommissionInvoiceNow;
+window.openCommissionUpload = openCommissionUpload;
+window.closeCommissionUpload = closeCommissionUpload;
+window.openCommissionVerify = openCommissionVerify;
+window.closeCommissionVerify = closeCommissionVerify;
+window.runCommissionCheckpointNow = runCommissionCheckpointNow;
+window.generateOneCommission = generateOneCommission;
+window.generateAllCommission = generateAllCommission;
+window.renderCommissionRates = renderCommissionRates;
+window.openCommissionRateForm = openCommissionRateForm;
+window.closeCommissionRateForm = closeCommissionRateForm;
+window.showCommissionRateHistory = showCommissionRateHistory;
+window.unlockCommissionPin = unlockCommissionPin;
+
 document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('new-dealer-form').addEventListener('submit', handleCreateDealer);
@@ -69,8 +98,11 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('ledger-dealer-select').addEventListener('change', onLedgerDealerChange);
   document.getElementById('new-payment-form').addEventListener('submit', handleSubmitPayment);
   document.getElementById('new-return-form').addEventListener('submit', handleSubmitReturn);
-  document.getElementById('new-commission-rule-form').addEventListener('submit', handleAddCommissionRule);
-  document.getElementById('calc-commission-form').addEventListener('submit', handleCalculateCommission);
+  document.getElementById('cm-rate-form').addEventListener('submit', handleSaveCommissionRate);
+  document.getElementById('cm-config-form').addEventListener('submit', handleSaveCommissionConfig);
+  document.getElementById('cm-pin-set-form').addEventListener('submit', handleSetCommissionPin);
+  document.getElementById('cm-upload-form').addEventListener('submit', handleCommissionUpload);
+  document.getElementById('cm-verify-form').addEventListener('submit', handleCommissionVerify);
   document.getElementById('new-user-form').addEventListener('submit', handleCreateUser);
   document.getElementById('vsr-form').addEventListener('submit', handleSubmitVehicleSaleReview);
   document.getElementById('cleanup-find-btn').addEventListener('click', handleFindLedgerCleanup);

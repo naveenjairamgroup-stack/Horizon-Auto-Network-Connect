@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { showToast_ } from '../utils.js';
+import { showToast_, formatDateTimeDisplay_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 export function loadImportLog() {
@@ -9,9 +9,11 @@ export function loadImportLog() {
     tbody.innerHTML = '';
     (rows || []).forEach(function (r) {
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + r['Upload Time'] + '</td><td>' + (r['Folder Type'] || '') + '</td><td>' + r['File Name'] + '</td>' +
-        '<td>' + r['Records Processed'] + '</td><td>' + r['Duplicates Skipped'] + '</td><td>' + (r['Updated Count'] || 0) + '</td>' +
-        '<td>' + (r['Reversed Count'] || 0) + '</td><td>' + r.Status + '</td>';
+      tr.innerHTML = '<td>' + formatDateTimeDisplay_(r['Upload Time']) + '</td>' +
+        '<td>' + esc_(r['Folder Type']) + '</td><td>' + esc_(r['File Name']) + '</td>' +
+        '<td>' + esc_(r['Records Processed']) + '</td><td>' + esc_(r['Duplicates Skipped']) + '</td>' +
+        '<td>' + esc_(r['Updated Count'] || 0) + '</td>' +
+        '<td>' + esc_(r['Reversed Count'] || 0) + '</td><td>' + esc_(r.Status) + '</td>';
       tbody.appendChild(tr);
     });
   }).catch(function (err) { showToast_(err); });

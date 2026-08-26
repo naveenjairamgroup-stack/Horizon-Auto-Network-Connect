@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { formatMoney_, statusBadge_, showToast_ } from '../utils.js';
+import { formatMoney_, statusBadge_, showToast_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 var vsrCurrentQueueId = null;
@@ -19,8 +19,10 @@ export function loadVehicleSaleReviews() {
           (session.username === r['Submitted By'] && (new Date() - new Date(r['Submitted On'])) / 60000 <= 60);
         actionHtml = canEdit ? '<button onclick="openVehicleSaleReviewForm(\'' + r['Queue ID'] + '\')">Edit</button>' : '<span style="color:#888; font-size:12px;">Locked</span>';
       }
-      tr.innerHTML = '<td>' + r['Dealer Code'] + '</td><td>' + r['Invoice No'] + '</td><td>' + (r['Customer Name'] || '') + '</td>' +
-        '<td>' + (r['Model Info'] || '') + '</td><td>' + (r['Purchase Type'] || '') + '</td><td>' + statusBadge_(r.Status) + '</td><td>' + actionHtml + '</td>';
+      tr.innerHTML = '<td>' + esc_(r['Dealer Code']) + '</td><td>' + esc_(r['Dealer Name']) + '</td>' +
+        '<td>' + esc_(r['Invoice No']) + '</td><td>' + esc_(r['Customer Name']) + '</td>' +
+        '<td>' + esc_(r['Model Info']) + '</td><td>' + esc_(r['Purchase Type']) + '</td>' +
+        '<td>' + statusBadge_(r.Status) + '</td><td>' + actionHtml + '</td>';
       tbody.appendChild(tr);
     });
   }).catch(function (err) { showToast_(err); });

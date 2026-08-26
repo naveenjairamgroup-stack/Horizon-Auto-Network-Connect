@@ -6,7 +6,7 @@ import { loadUsers } from './pages/userMaster.js';
 import { loadLedger, loadDealerDropdowns } from './pages/ledger.js';
 import { loadPayments } from './pages/payments.js';
 import { loadReturns } from './pages/returns.js';
-import { loadCommissionRules } from './pages/commission.js';
+import { loadCommissionPage } from './pages/commission.js';
 import { loadAuditLog } from './pages/auditLog.js';
 import { loadVehicleSaleReviews } from './pages/vehicleSaleReview.js';
 import { loadPartsSaleReviewQueue } from './pages/partsReview.js';
@@ -17,7 +17,7 @@ export function buildSidebar(role) {
     'Admin':            ['Dashboard', 'DealerMaster', 'UserMaster', 'Ledger', 'Payments', 'Returns', 'Commission', 'VehicleSaleReview', 'PartsReview', 'Imports', 'AuditLog'],
     'Network Manager':  ['Dashboard', 'DealerMaster', 'Ledger', 'Payments', 'Returns', 'VehicleSaleReview', 'Imports'],
     'Accounts':         ['Dashboard', 'DealerMaster', 'Ledger', 'Payments', 'Returns', 'Commission', 'PartsReview', 'Imports'],
-    'Dealer':           ['Dashboard', 'Ledger', 'Payments']
+    'Dealer':           ['Dashboard', 'Ledger', 'Payments', 'Commission']
   };
   var labels = {
     Dashboard: 'Dashboard', DealerMaster: 'Dealer master', UserMaster: 'User master',
@@ -45,7 +45,7 @@ export function buildSidebar(role) {
       }
       if (name === 'Payments') loadPayments();
       if (name === 'Returns') loadReturns();
-      if (name === 'Commission') loadCommissionRules();
+      if (name === 'Commission') loadCommissionPage();
       if (name === 'AuditLog') loadAuditLog();
       if (name === 'VehicleSaleReview') loadVehicleSaleReviews();
       if (name === 'PartsReview') loadPartsSaleReviewQueue();

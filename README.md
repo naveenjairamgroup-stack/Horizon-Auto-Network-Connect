@@ -75,6 +75,68 @@ docs/
 2. Add it to the `API_DISPATCH` object in `backend/Code.gs` — this is both the router and the security whitelist; anything not listed there cannot be called from the frontend.
 3. Call it from the frontend the same way as everything else: `api('yourFunctionName', session.token, ...)`.
 
+## Network commission (ASC vehicle commission)
+
+Commission payable to ASC dealers on the vehicles they sell. Per **frame**, not
+per invoice.
+
+```
+Vehicle com   Model Variant -> Commission_Rate_Master
+Reg com       flat amount, ONLY when Registration Type = 'Permanent Registration'
+Ins com       (Insurance Amount / 1.18) x rate%   (13% default, 6.5% for some ASCs)
+              ------------------------------------------------------------------
+Taxable       = sum of the above           (decimals kept)
+SGST + CGST   = 9% each
+Invoice       = round(Taxable x 1.18)      (whole rupees — rounded ONCE, at the end)
+```
+
+Source data is `Vehicle_Sale_Review_Queue` (Status = `Submitted` only) joined to
+`Vehicle_Sale_Detail` (Source = `ASC`). `Pending` rows aren't filled in yet and
+`Cancelled` rows drop out automatically, which is why cancellations need no
+special handling anywhere in the engine. A frame belongs to a month by its
+**Invoice Date**, so a late import lands in the month it was actually sold in.
+
+### Lifecycle
+
+```
+Generated ──▶ Invoice Requested ──▶ Invoice Uploaded ──▶ Posted 🔒
+   │                  │                     │                │
+ NM/Accounts/     ASC can now         ASC uploads its    Accounts/Admin
+ Admin review;    see the figures     tax invoice        enter the Tally
+ can regenerate                       (amount must       entry date; ledger
+                                       match exactly)     Credit posts on
+                                                          THAT date
+```
+
+Regeneration is allowed **only** in `Generated`. Once an ASC has been asked for
+an invoice the figures must stop moving underneath it, and once `Posted` the
+month is closed permanently — a frame arriving later is ignored rather than
+quietly reopening a month Accounts has already put through Tally.
+
+### Rates and settings are append-only
+
+Editing a rate never overwrites: it writes a new row with a new *Effective
+From*, and the old row stays as history. The rate that applies is the newest
+one already in force — deliberately "latest wins" rather than "whatever was in
+force on the sale date", so an unposted month recalculates at the current rate.
+Posted months are frozen and unaffected.
+
+Rate edits need the **commission PIN** (Admin/Accounts/NM; one shared PIN,
+unlocks for 10 minutes). Settings — registration amount, insurance %, GST % —
+are Admin-only and don't need the PIN.
+
+### The monthly checkpoint
+
+A commission rate that doesn't exist is the failure mode that matters: the
+spreadsheet this replaces silently paid one ASC ₹14,500 less than it was owed
+because nine rows resolved to `#REF!`. So an unpriced Model Variant **blocks
+that ASC's report** rather than being treated as zero, and the 1st-of-month
+checkpoint surfaces it — with an inline *Add rate* button — while there's still
+a day to fix it before generation on the 2nd. One blocked ASC never blocks the
+others.
+
+See `docs/DEPLOYMENT_GUIDE.md` §Part 3 for the one-time setup.
+
 ## Performance notes
 
 Two real inefficiencies were found and fixed (not every generic "make it

@@ -112,6 +112,68 @@ python3 build.py
 
 ---
 
+## Part 3 — Commission module setup (one-time, after deploying)
+
+The commission module needs three things done once, in this order.
+
+### 3.1 Create the new sheet tabs
+
+In the Apps Script editor, pick `setupDatabase` from the function dropdown and
+Run. It adds four tabs — `Commission_Rate_Master`, `Commission_Config`,
+`Commission_Report`, `Commission_Report_Line` — and seeds the config defaults
+(registration ₹500, insurance 13%, SGST 9%, CGST 9%).
+
+Safe to re-run: it only fills in what's missing and never touches existing data.
+The old `Commission_Master` and `Commission_Entries` tabs are deliberately left
+alone — nothing reads them any more, so you can ignore or delete them.
+
+### 3.2 Set the commission PIN
+
+Log in as Admin → **Commission → Settings → Commission PIN**. Until this is set,
+nobody can add or change a commission rate.
+
+One PIN for everyone. Admin, Accounts and Network Manager all use it; entering
+it unlocks rate editing for 10 minutes. Only Admin can set or reset it, and it
+is stored hashed — a forgotten PIN is replaced, never recovered.
+
+### 3.3 Configure per-dealer insurance rates
+
+The default is 13%. For each ASC that gets a different rate, go to
+**Commission → Settings → Change a setting**:
+
+- Setting: *Insurance commission (%)*
+- Dealer code: the ASC's code (blank means all dealers)
+- Value: e.g. `6.5`
+- Effective from: the date it starts
+
+Same append-only rule as rates: a change writes a new row and the old value
+stays as history.
+
+### 3.4 Turn on the monthly schedule
+
+In the Apps Script editor, run `setupCommissionTriggers` once. This sets:
+
+- **1st of the month, 09:00** — checkpoint. Any ASC whose sales include a Model
+  Variant with no rate on file is flagged, and a notification is raised so
+  there's a day to fix it.
+- **2nd of the month, 09:00** — generate. Every ASC that came through the
+  checkpoint clean gets its report for the previous month.
+
+Safe to re-run; it clears its own previous triggers first. You can also run
+either step by hand from **Commission → Checkpoint** at any time.
+
+### 3.5 Add the commission rates
+
+Rates are entered through the UI, not imported: **Commission → Commission
+rates → + Add model**.
+
+You don't need to enter all of them up front. Run the checkpoint for the month
+you're working on — every variant that's missing a rate is listed with an
+**Add rate** button next to it, so you only ever enter the variants that
+actually sold.
+
+---
+
 ## Why a proxy? (what actually went wrong, and why this fixes it)
 
 `google.script.run` — the usual way an Apps Script page talks to its own

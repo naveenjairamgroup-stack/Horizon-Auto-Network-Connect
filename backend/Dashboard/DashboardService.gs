@@ -14,10 +14,16 @@ function getDashboardSummary(token) {
     var totalOutstanding = 0;
     var overLimit = 0;
     dealers.forEach(function (d) {
-      var outstanding = computeOutstanding_(d['Dealer Code']);
-      totalOutstanding += outstanding;
-      var limit = Number(d['Credit Limit']) || 0;
-      if (limit > 0 && outstanding > limit) overLimit++;
+      // Deliberately reuses creditStatusFor_ rather than repeating the
+      // threshold arithmetic. The two used to disagree: this KPI required
+      // `limit > 0`, while creditStatusFor_ also flags Red via
+      // `(limit - outstanding) < 0`, which is true whenever a dealer has an
+      // outstanding balance and NO credit limit set. Those dealers showed Red
+      // in the table below but were never counted here, so the KPI sat at 0
+      // with red rows visible underneath it. One rule, one place, always agree.
+      var cs = creditStatusFor_(d);
+      totalOutstanding += cs.outstanding;
+      if (cs.status === 'Red') overLimit++;
     });
     return {
       totalDealers: dealers.length,

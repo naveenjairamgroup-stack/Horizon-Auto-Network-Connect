@@ -36,6 +36,43 @@ export function formatDateDisplay_(value) {
   return dd + '-' + mm + '-' + yyyy;
 }
 
+/**
+ * dd-mm-yyyy HH:mm:ss in Asia/Kolkata, whatever timezone the browser is in.
+ *
+ * Backend timestamps arrive as UTC ISO strings ("2026-08-24T07:21:08.829Z")
+ * because getAllRows converts every Date with toISOString(). Rendering those
+ * raw is what showed up in the Audit and Import logs. Note this deliberately
+ * does NOT rely on the browser's own timezone — a login from outside India
+ * would otherwise display a different clock time for the same record.
+ */
+export function formatDateTimeDisplay_(value) {
+  if (!value) return '';
+  var d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  var parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  }).formatToParts(d).reduce(function (acc, p) { acc[p.type] = p.value; return acc; }, {});
+  return parts.day + '-' + parts.month + '-' + parts.year + ' ' +
+    parts.hour + ':' + parts.minute + ':' + parts.second;
+}
+
+/**
+ * Escapes text before it goes into an innerHTML string. Import files carry
+ * customer names, financier names and remarks straight through to these
+ * tables, and none of that is sanitised on the way in, so anything with an
+ * angle bracket in it would otherwise be parsed as markup.
+ */
+export function esc_(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function showToast_(err, successMsg) {
   var el = document.getElementById('toast');
   el.textContent = err ? (err.message || String(err)) : successMsg;
