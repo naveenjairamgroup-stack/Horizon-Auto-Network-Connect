@@ -125,6 +125,34 @@ Rate edits need the **commission PIN** (Admin/Accounts/NM; one shared PIN,
 unlocks for 10 minutes). Settings — registration amount, insurance %, GST % —
 are Admin-only and don't need the PIN.
 
+### Invoice, email and PDFs
+
+Pressing **Request invoice** emails the ASC with the month's figures inline and
+a frame-wise breakup PDF attached, copying Accounts, Finance and Sales. The
+email is sent *before* the status moves, so a mail failure leaves the report in
+`Generated` and the request can just be retried — rather than marking an ASC as
+asked when nothing reached them.
+
+The ASC then gets a tax invoice already filled in with everything except the
+invoice number and date. They enter those, print it on their own letterhead
+(the top and bottom of the page are left blank for it, with adjustable
+margins), sign, stamp, and upload the scan. The number and date can be changed
+and reprinted any number of times up until upload, after which they are locked
+to whatever was physically signed.
+
+Both documents download as PDFs from the reports list. The invoice HTML is
+built once, by `buildInvoiceHtml_`, and used for both printing and the PDF —
+two layouts would drift apart the first time a column moved.
+
+### A note on the Month column
+
+Sheets converts the string `2026-08` into a date on write. Months are therefore
+written through `monthCell_()` (a leading apostrophe forces text) and read
+through `normalizeMonthKey_()`, which also repairs rows written before this was
+understood. Without it the month filter silently matched nothing, and
+`findCommissionReport_` could not see an existing report — so regenerating
+would have appended a duplicate instead of replacing.
+
 ### The monthly checkpoint
 
 A commission rate that doesn't exist is the failure mode that matters: the

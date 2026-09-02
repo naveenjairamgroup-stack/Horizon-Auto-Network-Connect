@@ -36,22 +36,12 @@ function login(username, password) {
     var token = createSession_(user);
     updateRowWhere(SHEETS.USER_MASTER, 'Username', user.Username, { 'Last Login': new Date() }, user.Username);
     logLoginAttempt_(username, true);
-    // Dealer ka type saath bhejte hain taaki sidebar decide kar sake ki
-    // kaunse tabs dikhane hain. Commission sirf ASC ko milta hai, isliye AD
-    // dealer ko wo tab dikhana bekaar hai. Non-dealer roles ke liye blank.
-    var dealerType = '';
-    if (user['Dealer Code']) {
-      var dealerRow = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', user['Dealer Code']);
-      if (dealerRow) dealerType = dealerRow.Type || '';
-    }
-
     return {
       token: token,
       username: user.Username,
       role: user.Role,
       dealerCode: user['Dealer Code'],
-      fullName: user['Full Name'],
-      dealerType: dealerType
+      fullName: user['Full Name']
     };
   });
 }

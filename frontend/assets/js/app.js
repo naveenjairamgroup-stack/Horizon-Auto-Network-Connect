@@ -34,7 +34,9 @@ import {
   runCommissionCheckpointNow, generateOneCommission, generateAllCommission,
   renderCommissionRates, openCommissionRateForm, closeCommissionRateForm,
   handleSaveCommissionRate, showCommissionRateHistory, unlockCommissionPin,
-  handleSaveCommissionConfig, handleSetCommissionPin
+  handleSaveCommissionConfig, handleSetCommissionPin,
+  openCommissionInvoice, closeCommissionInvoice, handleSaveCommissionInvoice,
+  printCommissionInvoice, downloadCommissionPdf
 } from './pages/commission.js';
 import {
   openVehicleSaleReviewForm, closeVehicleSaleReviewForm, handleSubmitVehicleSaleReview,
@@ -89,6 +91,10 @@ window.openCommissionRateForm = openCommissionRateForm;
 window.closeCommissionRateForm = closeCommissionRateForm;
 window.showCommissionRateHistory = showCommissionRateHistory;
 window.unlockCommissionPin = unlockCommissionPin;
+window.openCommissionInvoice = openCommissionInvoice;
+window.closeCommissionInvoice = closeCommissionInvoice;
+window.printCommissionInvoice = printCommissionInvoice;
+window.downloadCommissionPdf = downloadCommissionPdf;
 
 document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('login-form').addEventListener('submit', handleLogin);
@@ -103,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('cm-pin-set-form').addEventListener('submit', handleSetCommissionPin);
   document.getElementById('cm-upload-form').addEventListener('submit', handleCommissionUpload);
   document.getElementById('cm-verify-form').addEventListener('submit', handleCommissionVerify);
+  document.getElementById('cm-invoice-form').addEventListener('submit', handleSaveCommissionInvoice);
   document.getElementById('new-user-form').addEventListener('submit', handleCreateUser);
   document.getElementById('vsr-form').addEventListener('submit', handleSubmitVehicleSaleReview);
   document.getElementById('cleanup-find-btn').addEventListener('click', handleFindLedgerCleanup);

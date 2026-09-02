@@ -34,6 +34,28 @@
     <button type="button" onclick="closeCommissionDetail()">Close</button>
   </div>
 
+  <!-- ASC prepares and prints its tax invoice here -->
+  <div class="card" id="cm-invoice-card" style="display:none;">
+    <h2 id="cm-invoice-title">Your tax invoice</h2>
+    <p style="color:#888; font-size:12px;" id="cm-invoice-hint"></p>
+    <form id="cm-invoice-form">
+      <input type="hidden" id="cm-invoice-report-id">
+      <div class="form-row">
+        <div><label>Invoice no.</label><input id="cm-invoice-no" required></div>
+        <div><label>Invoice date</label><input id="cm-invoice-date" type="date" required></div>
+      </div>
+      <button type="submit">Save</button>
+      <button type="button" onclick="printCommissionInvoice()">Save &amp; print</button>
+      <button type="button" onclick="downloadCommissionPdf(document.getElementById('cm-invoice-report-id').value,'invoice')">Invoice PDF</button>
+      <button type="button" onclick="closeCommissionInvoice()">Close</button>
+    </form>
+    <p style="color:#888; font-size:12px; margin-top:8px;">
+      Print it on your letterhead — the top and bottom of the page are left blank for it, and you can
+      adjust how much space in the print window. The number and date can be changed and reprinted as
+      many times as you need, up until you upload the signed copy.
+    </p>
+  </div>
+
   <!-- ASC uploads its tax invoice here -->
   <div class="card" id="cm-upload-card" style="display:none;">
     <h2 id="cm-upload-title">Upload tax invoice</h2>

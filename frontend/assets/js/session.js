@@ -12,16 +12,10 @@ export const session = {
   username: null,
   fullName: null,
   role: null,
-  dealerCode: null,
-  dealerType: null
+  dealerCode: null
 };
 
-// The "-v2" suffix deliberately invalidates every session saved before
-// dealerType existed. Without it, anyone already logged in would keep a
-// stored session with no dealerType, and an ASC dealer would silently lose
-// the Commission tab until they happened to log out. One forced re-login is
-// cheaper than that confusion.
-var STORAGE_KEY = 'horizon-auto-network-connect-session-v2';
+var STORAGE_KEY = 'horizon-auto-network-connect-session';
 
 function persistSession() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -29,8 +23,7 @@ function persistSession() {
     username: session.username,
     fullName: session.fullName,
     role: session.role,
-    dealerCode: session.dealerCode,
-    dealerType: session.dealerType
+    dealerCode: session.dealerCode
   }));
 }
 
@@ -45,7 +38,6 @@ export function loadSession() {
     session.fullName = stored.fullName;
     session.role = stored.role;
     session.dealerCode = stored.dealerCode;
-    session.dealerType = stored.dealerType || '';
     return true;
   } catch (e) {
     localStorage.removeItem(STORAGE_KEY);
@@ -60,7 +52,6 @@ export function setSession(result) {
   session.fullName = result.fullName;
   session.role = result.role;
   session.dealerCode = result.dealerCode;
-  session.dealerType = result.dealerType || '';
   persistSession();
 }
 
@@ -70,7 +61,6 @@ export function clearSession() {
   session.fullName = null;
   session.role = null;
   session.dealerCode = null;
-  session.dealerType = null;
   localStorage.removeItem(STORAGE_KEY);
 }
 

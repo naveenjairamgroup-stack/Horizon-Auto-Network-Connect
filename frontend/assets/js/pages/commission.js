@@ -113,20 +113,30 @@ function agingText_(a) {
 }
 
 function reportActions_(r) {
-  var html = '<button class="link-btn" onclick="openCommissionDetail(' + jsArg_(r['Report ID']) + ')">View</button>';
+  var id = jsArg_(r['Report ID']);
   var status = String(r.Status);
+  var html = '<button class="link-btn" onclick="openCommissionDetail(' + id + ')">View</button>';
+
+  // Breakup is always downloadable; the tax invoice only exists once the ASC
+  // has been asked for one, so its button appears from that point on.
+  html += ' <button class="link-btn" onclick="downloadCommissionPdf(' + id + ',\'breakup\')">Breakup PDF</button>';
+  if (status !== 'Generated') {
+    html += ' <button class="link-btn" onclick="downloadCommissionPdf(' + id + ',\'invoice\')">Invoice PDF</button>';
+  }
+
   if (!isDealer_() && status === 'Generated') {
     html += ' <button class="link-btn" onclick="regenerateCommission(' + jsArg_(r['Dealer Code']) + ',' + jsArg_(r.Month) + ')">Regenerate</button>';
-    html += ' <button onclick="requestCommissionInvoiceNow(' + jsArg_(r['Report ID']) + ')">Request invoice</button>';
+    html += ' <button onclick="requestCommissionInvoiceNow(' + id + ')">Request invoice</button>';
   }
   if (isDealer_() && status === 'Invoice Requested') {
-    html += ' <button onclick="openCommissionUpload(' + jsArg_(r['Report ID']) + ')">Upload invoice</button>';
+    html += ' <button onclick="openCommissionInvoice(' + id + ')">Prepare invoice</button>';
+    html += ' <button onclick="openCommissionUpload(' + id + ')">Upload signed copy</button>';
   }
   if (canVerify_() && status === 'Invoice Uploaded') {
-    html += ' <button onclick="openCommissionVerify(' + jsArg_(r['Report ID']) + ')">Verify &amp; post</button>';
+    html += ' <button onclick="openCommissionVerify(' + id + ')">Verify &amp; post</button>';
   }
   if (r['Attachment Link']) {
-    html += ' <a class="link-btn" href="' + esc_(r['Attachment Link']) + '" target="_blank" rel="noopener">Invoice copy</a>';
+    html += ' <a class="link-btn" href="' + esc_(r['Attachment Link']) + '" target="_blank" rel="noopener">Signed copy</a>';
   }
   return html;
 }
@@ -205,23 +215,25 @@ export function regenerateCommission(dealerCode, month) {
 }
 
 export function requestCommissionInvoiceNow(reportId) {
-  if (!window.confirm('Invoice request karne ke baad figures lock ho jayenge aur ASC ko dikhne lagenge. Continue?')) return;
-  api('requestCommissionInvoice', session.token, reportId).then(function () {
-    showToast_(null, 'Invoice requested. ASC ab apni report dekh sakta hai.');
+  if (!window.confirm('ASC ko breakup ke saath email chala jayega aur figures lock ho jayenge. Continue?')) return;
+  api('requestCommissionInvoice', session.token, reportId).then(function (res) {
+    showToast_(null, 'Invoice requested. Email bhej diya: ' + (res.emailedTo || []).join(', '));
     loadCommissionReports();
   }).catch(function (err) { showToast_(err); });
 }
 
 // ------------------------------------------------------- ASC invoice ----
 export function openCommissionUpload(reportId) {
-  var r = null;
-  for (var i = 0; i < reportsCache.length; i++) { if (reportsCache[i]['Report ID'] === reportId) { r = reportsCache[i]; break; } }
+  var r = findReport_(reportId);
   if (!r) { showToast_(new Error('Report not found.')); return; }
   document.getElementById('cm-upload-report-id').value = reportId;
   document.getElementById('cm-upload-title').textContent = 'Upload tax invoice — ' + r.Month;
   document.getElementById('cm-upload-hint').textContent =
     'Invoice amount exactly ' + formatMoney_(r['Invoice Amount']) + ' hona chahiye, warna upload accept nahi hoga.';
   document.getElementById('cm-upload-amount').value = r['Invoice Amount'];
+  // Carry over whatever the ASC printed, so they don't retype it.
+  document.getElementById('cm-upload-invoice-no').value = r['ASC Invoice No'] || '';
+  document.getElementById('cm-upload-invoice-date').value = isoDateInput_(r['ASC Invoice Date']);
   document.getElementById('cm-upload-card').style.display = 'block';
   document.getElementById('cm-upload-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -252,10 +264,106 @@ export function handleCommissionUpload(event) {
   }).catch(function (err) { showToast_(err); });
 }
 
+// ------------------------------------ ASC invoice: prepare & print ----
+export function openCommissionInvoice(reportId) {
+  var r = findReport_(reportId);
+  if (!r) { showToast_(new Error('Report not found.')); return; }
+  document.getElementById('cm-invoice-report-id').value = reportId;
+  document.getElementById('cm-invoice-title').textContent = 'Your tax invoice — ' + r.Month;
+  document.getElementById('cm-invoice-hint').textContent =
+    'Amount ' + formatMoney_(r['Invoice Amount']) + '. Invoice no. aur date daal ke print karo.';
+  document.getElementById('cm-invoice-no').value = r['ASC Invoice No'] || '';
+  document.getElementById('cm-invoice-date').value = isoDateInput_(r['ASC Invoice Date']);
+  document.getElementById('cm-invoice-card').style.display = 'block';
+  document.getElementById('cm-invoice-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+export function closeCommissionInvoice() {
+  document.getElementById('cm-invoice-card').style.display = 'none';
+}
+
+/** Saves the number and date. Returns the promise so "Save & print" can chain onto it. */
+function saveInvoiceDraft_() {
+  var reportId = document.getElementById('cm-invoice-report-id').value;
+  var no = document.getElementById('cm-invoice-no').value;
+  var date = document.getElementById('cm-invoice-date').value;
+  if (!no || !date) return Promise.reject(new Error('Invoice number aur date dono chahiye.'));
+  return api('saveCommissionInvoiceDraft', session.token, reportId, no, date)
+    .then(function () { return reportId; });
+}
+
+export function handleSaveCommissionInvoice(event) {
+  event.preventDefault();
+  saveInvoiceDraft_().then(function () {
+    showToast_(null, 'Saved.');
+    loadCommissionReports();
+  }).catch(function (err) { showToast_(err); });
+}
+
+/**
+ * Saves first, then opens the filled invoice in a new tab for printing.
+ * The window is opened synchronously, before the save round-trip, because a
+ * window.open() that happens inside a promise callback is treated as a popup
+ * and gets blocked.
+ */
+export function printCommissionInvoice() {
+  var win = window.open('', '_blank');
+  if (!win) { showToast_(new Error('Popup blocked. Is site ke liye popups allow karo.')); return; }
+  win.document.write('<p style="font-family:system-ui;padding:24px;color:#666;">Preparing your invoice…</p>');
+
+  saveInvoiceDraft_().then(function (reportId) {
+    return api('getCommissionInvoiceHtml', session.token, reportId);
+  }).then(function (html) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    loadCommissionReports();
+  }).catch(function (err) {
+    win.close();
+    showToast_(err);
+  });
+}
+
+/** Downloads a PDF the backend built. kind: 'invoice' | 'breakup'. */
+export function downloadCommissionPdf(reportId, kind) {
+  showToast_(null, 'PDF ban raha hai…');
+  api('getCommissionPdf', session.token, reportId, kind).then(function (res) {
+    var bytes = atob(res.base64);
+    var buf = new Uint8Array(bytes.length);
+    for (var i = 0; i < bytes.length; i++) buf[i] = bytes.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }));
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = res.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Revoking immediately can cancel the download in some browsers.
+    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+  }).catch(function (err) { showToast_(err); });
+}
+
+function findReport_(reportId) {
+  for (var i = 0; i < reportsCache.length; i++) {
+    if (reportsCache[i]['Report ID'] === reportId) return reportsCache[i];
+  }
+  return null;
+}
+
+/** Backend dates arrive as UTC ISO strings; <input type="date"> needs the IST calendar day. */
+function isoDateInput_(value) {
+  if (!value) return '';
+  var d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  var p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(d).reduce(function (a, x) { a[x.type] = x.value; return a; }, {});
+  return p.year + '-' + p.month + '-' + p.day;
+}
+
 // ------------------------------------------------------------ Verify ----
 export function openCommissionVerify(reportId) {
-  var r = null;
-  for (var i = 0; i < reportsCache.length; i++) { if (reportsCache[i]['Report ID'] === reportId) { r = reportsCache[i]; break; } }
+  var r = findReport_(reportId);
   if (!r) { showToast_(new Error('Report not found.')); return; }
   document.getElementById('cm-verify-report-id').value = reportId;
   document.getElementById('cm-verify-title').textContent =

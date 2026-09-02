@@ -24,22 +24,9 @@ export function buildSidebar(role) {
     Ledger: 'Ledger', Payments: 'Payments', Returns: 'Returns', Commission: 'Commission', AuditLog: 'Audit log',
     VehicleSaleReview: 'Vehicle sale review', PartsReview: 'Parts review', Imports: 'Imports'
   };
-
-  // Commission sirf ASC dealers ko milta hai, isliye AD dealer ke sidebar se
-  // wo tab hata dete hain — jo tab kabhi kaam ka na ho use dikhana confusion
-  // hi banata hai. Yeh sirf UI hai: backend har commission call pe khud role
-  // aur dealer check karta hai, to tab chhupa dene se security nahi aati.
-  // Unknown/blank type ko bhi chhupa rahe hain — naya dealer jiska Type set
-  // nahi hua, use galti se ASC maan lena bad default hoga.
-  var visible = (links[role] || []).filter(function (name) {
-    if (name !== 'Commission') return true;
-    if (role !== 'Dealer') return true;
-    return String(session.dealerType || '').trim().toUpperCase() === 'ASC';
-  });
-
   var container = document.getElementById('sidebar-links');
   container.innerHTML = '';
-  visible.forEach(function (name) {
+  (links[role] || []).forEach(function (name) {
     var a = document.createElement('a');
     a.href = '#';
     a.textContent = labels[name] || name;

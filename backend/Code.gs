@@ -85,7 +85,10 @@ var API_DISPATCH = {
   listCommissionReports: listCommissionReports,
   getCommissionReportDetail: getCommissionReportDetail,
   requestCommissionInvoice: requestCommissionInvoice,
+  saveCommissionInvoiceDraft: saveCommissionInvoiceDraft,
   uploadCommissionInvoice: uploadCommissionInvoice,
+  getCommissionInvoiceHtml: getCommissionInvoiceHtml,
+  getCommissionPdf: getCommissionPdf,
   verifyCommissionInvoice: verifyCommissionInvoice,
 
   getDashboardSummary: getDashboardSummary,

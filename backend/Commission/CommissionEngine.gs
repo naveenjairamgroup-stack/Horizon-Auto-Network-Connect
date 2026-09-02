@@ -195,7 +195,9 @@ function commissionCheckpoint_(month) {
   var ascDealers = getAllRows(SHEETS.DEALER_MASTER).filter(function (d) {
     return String(d.Type) === DEALER_TYPES.ASC && String(d.Status) !== 'Inactive';
   });
-  var existingReports = getAllRows(SHEETS.COMMISSION_REPORT).filter(function (r) { return String(r.Month) === month; });
+  var existingReports = getAllRows(SHEETS.COMMISSION_REPORT).filter(function (r) {
+    return normalizeMonthKey_(r.Month) === month;
+  });
 
   return ascDealers.map(function (d) {
     var dealerCode = d['Dealer Code'];
@@ -277,7 +279,7 @@ function generateCommissionReport_(dealerCode, month, actor) {
   appendRow(SHEETS.COMMISSION_REPORT, {
     'Report ID': reportId,
     'Dealer Code': dealerCode,
-    'Month': month,
+    'Month': monthCell_(month),
     'Status': COMMISSION_STATUS.GENERATED,
     'Frame Count': summary.frameCount,
     'Vehicle Com': summary.vehicleCom,
@@ -297,7 +299,7 @@ function generateCommissionReport_(dealerCode, month, actor) {
       'Line ID': generateId('CML'),
       'Report ID': reportId,
       'Dealer Code': dealerCode,
-      'Month': month,
+      'Month': monthCell_(month),
       'Invoice No': l.invoiceNo,
       'Invoice Date': l.invoiceDate,
       'Frame No': l.frameNo,
@@ -370,7 +372,7 @@ function listCommissionReports(token, month) {
   return safeRun('listCommissionReports', function () {
     var session = requireRole_(token, PERMISSIONS.Commission.view);
     var rows = getAllRows(SHEETS.COMMISSION_REPORT);
-    if (month) rows = rows.filter(function (r) { return String(r.Month) === month; });
+    if (month) rows = rows.filter(function (r) { return normalizeMonthKey_(r.Month) === month; });
 
     if (session.role === ROLES.DEALER) {
       rows = rows.filter(function (r) {
@@ -384,6 +386,7 @@ function listCommissionReports(token, month) {
       var out = {};
       Object.keys(r).forEach(function (k) { out[k] = r[k]; });
       out['Dealer Name'] = names[r['Dealer Code']] || '';
+      out.Month = normalizeMonthKey_(r.Month);
       out.aging = commissionAging_(r);
       return out;
     }).sort(function (a, b) {
@@ -434,13 +437,22 @@ function getCommissionReportDetail(token, reportId) {
     var header = {};
     Object.keys(report).forEach(function (k) { header[k] = report[k]; });
     header['Dealer Name'] = names[report['Dealer Code']] || '';
+    header.Month = normalizeMonthKey_(report.Month);
     header.aging = commissionAging_(report);
     return { report: header, lines: lines };
   });
 }
 
 // ====================================================== INVOICE WORKFLOW =
-/** Hands the report to the ASC: from here the figures are frozen and the ASC can see them. */
+/**
+ * Hands the report to the ASC: from here the figures are frozen, the ASC can
+ * see them, and an email goes out with the full breakup attached.
+ *
+ * The email is sent BEFORE the status is written. If MailApp fails (quota,
+ * bad address) the whole call throws and the report stays in Generated, so
+ * the request can simply be retried — rather than the ASC being marked as
+ * asked when nothing ever reached them.
+ */
 function requestCommissionInvoice(token, reportId) {
   return safeRun('requestCommissionInvoice', function () {
     var session = requireRole_(token, PERMISSIONS.Commission.request);
@@ -449,23 +461,143 @@ function requestCommissionInvoice(token, reportId) {
     if (String(report.Status) !== COMMISSION_STATUS.GENERATED) {
       throw new Error('Invoice can only be requested for a report in "' + COMMISSION_STATUS.GENERATED + '" status. This one is "' + report.Status + '".');
     }
+
+    var dealer = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', report['Dealer Code']);
+    if (!dealer) throw new Error('Dealer not found: ' + report['Dealer Code']);
+    if (!isNonEmpty(dealer.Email)) {
+      throw new Error('No email address on file for ' + dealer['Dealer Name'] +
+        '. Add it in Dealer master, then request the invoice again.');
+    }
+
+    var lines = findRows(SHEETS.COMMISSION_REPORT_LINE, { 'Report ID': reportId })
+      .sort(function (a, b) { return parseInvoiceDate_(a['Invoice Date']) - parseInvoiceDate_(b['Invoice Date']); });
+
+    var month = normalizeMonthKey_(report.Month);
+    var period = monthPeriod_(month);
+    var pdfName = 'Commission-Breakup-' + slug_(dealer['Dealer Name']) + '-' +
+      Utilities.formatDate(new Date(month + '-01T00:00:00Z'), 'Asia/Kolkata', 'MMM-yyyy');
+
+    var recipients = [dealer.Email].concat(COMMISSION_EMAIL_CC);
+    MailApp.sendEmail({
+      to: dealer.Email,
+      cc: COMMISSION_EMAIL_CC.join(','),
+      // Reply-To carries all three internal desks so a plain "Reply" from the
+      // ASC reaches them, instead of only the Google account that owns this
+      // script.
+      replyTo: COMMISSION_EMAIL_CC.join(','),
+      name: COMMISSION_EMAIL_SENDER_NAME,
+      subject: 'Commission for ' + period.label + ' — ' + formatCurrency(report['Invoice Amount']) +
+        ' — please raise your tax invoice',
+      htmlBody: buildRequestEmailHtml_(report, dealer),
+      attachments: [htmlToPdfBlob_(buildBreakupHtml_(report, lines, dealer), pdfName)]
+    });
+
     updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
       'Status': COMMISSION_STATUS.INVOICE_REQUESTED,
       'Invoice Requested On': new Date(),
-      'Invoice Requested By': session.username
+      'Invoice Requested By': session.username,
+      'Email Sent On': new Date(),
+      'Email Recipients': recipients.join(', ')
     }, session.username);
 
     appendRow(SHEETS.NOTIFICATION_LOG, {
       'Dealer Code': report['Dealer Code'],
       'Type': 'Commission Invoice Requested',
-      'Message': 'Commission for ' + report.Month + ' is ready: ' + formatCurrency(report['Invoice Amount']) +
-        '. Please raise your tax invoice for this amount and upload it in the Commission tab.',
+      'Message': 'Commission for ' + month + ' is ready: ' + formatCurrency(report['Invoice Amount']) +
+        '. Tax invoice raise karke Commission tab me upload karein.',
       'Timestamp': new Date(),
       'Read Status': false
     }, session.username);
 
+    return { emailedTo: recipients };
+  });
+}
+
+/**
+ * The ASC saving (or changing) its invoice number and date before printing.
+ *
+ * Separate from upload on purpose: the ASC needs the number on the printed
+ * sheet before there is anything to scan, and may reprint with a corrected
+ * number any number of times. Allowed only while the report is still waiting
+ * for an invoice — once uploaded, the number is what was physically signed
+ * and must stop moving.
+ */
+function saveCommissionInvoiceDraft(token, reportId, invoiceNo, invoiceDate) {
+  return safeRun('saveCommissionInvoiceDraft', function () {
+    var session = requireRole_(token, PERMISSIONS.Commission.upload);
+    var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+    if (!report) throw new Error('Report not found: ' + reportId);
+    if (session.role === ROLES.DEALER && String(report['Dealer Code']) !== String(session.dealerCode)) {
+      throw new Error('You can only edit your own commission invoice.');
+    }
+    if (String(report.Status) !== COMMISSION_STATUS.INVOICE_REQUESTED) {
+      throw new Error('This report is at "' + report.Status + '" — the invoice details can no longer be changed.');
+    }
+    if (!isNonEmpty(invoiceNo)) throw new Error('Invoice number is required.');
+    if (!isNonEmpty(invoiceDate)) throw new Error('Invoice date is required.');
+
+    updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
+      'ASC Invoice No': sanitizeString(invoiceNo),
+      'ASC Invoice Date': parseInvoiceDate_(invoiceDate)
+    }, session.username);
     return true;
   });
+}
+
+/**
+ * The printable tax invoice as a standalone HTML page, opened in a new tab by
+ * the frontend. Printing happens in the browser rather than server-side so the
+ * ASC can nudge the letterhead margins and reprint instantly.
+ */
+function getCommissionInvoiceHtml(token, reportId) {
+  return safeRun('getCommissionInvoiceHtml', function () {
+    var ctx = commissionDocContext_(token, reportId);
+    return buildInvoiceHtml_(ctx.report, ctx.dealer, true);
+  });
+}
+
+/**
+ * A PDF of either document, base64-encoded for the browser to download.
+ * kind: 'invoice' | 'breakup'.
+ */
+function getCommissionPdf(token, reportId, kind) {
+  return safeRun('getCommissionPdf', function () {
+    var ctx = commissionDocContext_(token, reportId);
+    var month = normalizeMonthKey_(ctx.report.Month);
+    var stamp = Utilities.formatDate(new Date(month + '-01T00:00:00Z'), 'Asia/Kolkata', 'MMM-yyyy');
+    var html, name;
+
+    if (kind === 'invoice') {
+      html = buildInvoiceHtml_(ctx.report, ctx.dealer, false);
+      name = 'Tax-Invoice-' + slug_(ctx.dealer['Dealer Name']) + '-' + stamp;
+    } else {
+      html = buildBreakupHtml_(ctx.report, ctx.lines, ctx.dealer);
+      name = 'Commission-Breakup-' + slug_(ctx.dealer['Dealer Name']) + '-' + stamp;
+    }
+
+    var blob = htmlToPdfBlob_(html, name);
+    return { filename: name + '.pdf', base64: Utilities.base64Encode(blob.getBytes()) };
+  });
+}
+
+/** Shared load + permission check for every document endpoint. A Dealer only ever reaches its own, and not while still under review. */
+function commissionDocContext_(token, reportId) {
+  var session = requireRole_(token, PERMISSIONS.Commission.view);
+  var report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+  if (!report) throw new Error('Report not found: ' + reportId);
+  if (session.role === ROLES.DEALER) {
+    if (String(report['Dealer Code']) !== String(session.dealerCode)) {
+      throw new Error('You can only view your own commission documents.');
+    }
+    if (String(report.Status) === COMMISSION_STATUS.GENERATED) {
+      throw new Error('This report is still under review and is not available yet.');
+    }
+  }
+  var dealer = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', report['Dealer Code']);
+  if (!dealer) throw new Error('Dealer not found: ' + report['Dealer Code']);
+  var lines = findRows(SHEETS.COMMISSION_REPORT_LINE, { 'Report ID': reportId })
+    .sort(function (a, b) { return parseInvoiceDate_(a['Invoice Date']) - parseInvoiceDate_(b['Invoice Date']); });
+  return { session: session, report: report, dealer: dealer, lines: lines };
 }
 
 /**
@@ -577,6 +709,34 @@ function verifyCommissionInvoice(token, reportId, tallyEntryDate, remarks) {
 }
 
 // ================================================================ HELPERS =
+/**
+ * Whatever came back from the sheet, turned into a clean 'YYYY-MM'.
+ *
+ * Sheets silently coerces the string '2026-08' into a DATE when it is
+ * written, and getAllRows then hands it back as the ISO string
+ * '2026-07-31T18:30:00.000Z' (IST midnight on 1 Aug is 18:30 UTC on 31 Jul).
+ * That broke three things at once: the month column displayed an ISO stamp,
+ * the month filter never matched, and — worst — findCommissionReport_ and the
+ * checkpoint could not find an existing report, so Regenerate would have
+ * appended a SECOND report row instead of replacing the first.
+ *
+ * Writes now go through monthCell_() so Sheets stores text, and every read
+ * goes through here so rows written before this fix still resolve correctly.
+ */
+function normalizeMonthKey_(value) {
+  if (!value) return '';
+  var s = String(value).trim();
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+  var d = new Date(value);
+  if (!isNaN(d.getTime())) return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM');
+  return s;
+}
+
+/** Leading apostrophe tells Sheets "this is text, do not parse it as a date". It is not part of the stored value. */
+function monthCell_(month) {
+  return "'" + month;
+}
+
 function requireCommissionMonth_(month) {
   if (!/^\d{4}-\d{2}$/.test(month || '')) {
     throw new Error('Month must be in YYYY-MM format, e.g. 2026-07.');
@@ -586,7 +746,8 @@ function requireCommissionMonth_(month) {
 function findCommissionReport_(dealerCode, month) {
   var rows = getAllRows(SHEETS.COMMISSION_REPORT);
   for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i]['Dealer Code']) === String(dealerCode) && String(rows[i].Month) === month) return rows[i];
+    if (String(rows[i]['Dealer Code']) === String(dealerCode) &&
+        normalizeMonthKey_(rows[i].Month) === month) return rows[i];
   }
   return null;
 }
@@ -597,6 +758,50 @@ function previousMonthKey_(from) {
   d.setDate(1);
   d.setMonth(d.getMonth() - 1);
   return Utilities.formatDate(d, 'Asia/Kolkata', 'yyyy-MM');
+}
+
+/**
+ * One-time repair for reports written before the Month fix.
+ *
+ * Rewrites every Month cell in Commission_Report and Commission_Report_Line
+ * as plain text 'YYYY-MM'. Safe to run more than once — a cell already in the
+ * right form is skipped, so nothing is touched twice and nothing is lost.
+ *
+ * Run once from the Apps Script editor after deploying.
+ */
+function fixCommissionMonthValues() {
+  var fixed = { reports: 0, lines: 0 };
+
+  [[SHEETS.COMMISSION_REPORT, 'reports'], [SHEETS.COMMISSION_REPORT_LINE, 'lines']].forEach(function (pair) {
+    var tab = pair[0];
+    var sheet = getSpreadsheet().getSheetByName(tab);
+    if (!sheet || sheet.getLastRow() < 2) return;
+
+    var col = SHEET_HEADERS[tab].indexOf('Month') + 1;
+    var range = sheet.getRange(2, col, sheet.getLastRow() - 1, 1);
+    var values = range.getValues();
+    var changed = false;
+
+    var out = values.map(function (row) {
+      var raw = row[0];
+      if (!raw) return row;
+      var key = normalizeMonthKey_(
+        (raw && typeof raw === 'object' && typeof raw.toISOString === 'function') ? raw.toISOString() : raw
+      );
+      if (String(raw) === key) return row;   // already plain text
+      changed = true;
+      fixed[pair[1]]++;
+      return [monthCell_(key)];
+    });
+
+    if (changed) {
+      range.setValues(out);
+      invalidateSheetCache_(tab);
+    }
+  });
+
+  Logger.log('Month values repaired — ' + fixed.reports + ' report row(s), ' + fixed.lines + ' line row(s).');
+  return fixed;
 }
 
 // =============================================================== TRIGGERS =

@@ -174,6 +174,51 @@ actually sold.
 
 ---
 
+## Part 4 — Commission email, invoice and PDFs (one-time)
+
+### 4.1 Repair the Month column
+
+Run `fixCommissionMonthValues` once from the Apps Script editor.
+
+Reports generated before this release stored the month as a date, because
+Sheets silently converts `2026-08` into 1 Aug 2026. That is why the Month
+column showed `2026-07-31T18:30:00.000Z` and typing a month into the filter
+returned nothing. It also meant the system could not find an existing report,
+so **Regenerate would have added a second row rather than replacing the first**
+— worth fixing before anyone presses it.
+
+Safe to re-run; rows already in the right form are skipped.
+
+### 4.2 Add Pin Code to Dealer master
+
+Run `setupDatabase` again. It adds a **Pin Code** column at the end of
+`Dealer_Master`. Fill it in for each ASC — it prints on their tax invoice.
+
+The invoice also uses Address, GST, PAN and Email from the same tab, so check
+those are right for every ASC before the first invoice goes out.
+
+### 4.3 Check the email quota
+
+Requesting an invoice sends one email with a PDF attached, to the ASC with
+Accounts, Finance and Sales in copy. Google Workspace allows 1,500 recipients
+a day; a consumer Gmail account allows 100. Seven ASCs is 28 recipients, so
+either is fine — but the limit is per account, shared with anything else that
+script sends.
+
+The sender's display name is set in `Config.gs`
+(`COMMISSION_EMAIL_SENDER_NAME`), and the copy list in
+`COMMISSION_EMAIL_CC`. The underlying address is always the Google account
+that owns the script and cannot be hidden. Replies go to the three copy
+addresses, not to that account.
+
+### 4.4 Company details on the invoice
+
+GSTIN, PAN, address and telephone live in `COMPANY` in `Config.gs`, along with
+the SAC code. These print on every commission invoice, so check them once
+against a real invoice before going live.
+
+---
+
 ## Why a proxy? (what actually went wrong, and why this fixes it)
 
 `google.script.run` — the usual way an Apps Script page talks to its own
