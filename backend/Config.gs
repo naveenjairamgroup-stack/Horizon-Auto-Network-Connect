@@ -63,7 +63,16 @@ var SHEETS = {
   COMMISSION_RATE_MASTER:     'Commission_Rate_Master',
   COMMISSION_CONFIG:          'Commission_Config',
   COMMISSION_REPORT:          'Commission_Report',
-  COMMISSION_REPORT_LINE:     'Commission_Report_Line'
+  COMMISSION_REPORT_LINE:     'Commission_Report_Line',
+
+  // One row per file uploaded through the portal. The SHA-256 of the file is
+  // what blocks the same export being imported twice.
+  IMPORT_FILE_LOG:            'Import_File_Log',
+
+  // Plain key/value settings Admin can change from the UI (mail recipients
+  // and the like). Anything not set here falls back to the constant of the
+  // same purpose in this file.
+  APP_SETTINGS:               'App_Settings'
 };
 
 // Header rows for every sheet. Setup.gs uses this to create tabs; SheetHelper.gs
@@ -91,7 +100,7 @@ var SHEET_HEADERS = {
   // ---- Drive import feature (Vehicle Sale / Parts / Inter-Dealer) ----
   Vehicle_Sale_Detail: ['Detail ID','Invoice No','Dealer Code','Source','Frame No','Model Name','Model Variant','Color','Taxable Value','Tax Amount','Frame Total Amount','Customer Name','Created On'],
   Vehicle_Sale_Review_Queue: ['Queue ID','Invoice No','Dealer Code','Customer Name','Frame Numbers','Model Info','Total Invoice Amount','Purchase Type','Financier','Hypothecation','Finance Amount','Registration Type','Registration Amount','Insurance Type','Insurance Amount','EW Type','EW Amount','HPA Amount','Status','Submitted By','Submitted On','Invoice Date'],
-  Parts_Sale_Detail:   ['Detail ID','Invoice No','Dealer Code','Order Type','Customer Name','Part Description','Part Number','HSN Code','Qty','Taxable Amount','Total Tax','Final Amount','Created On'],
+  Parts_Sale_Detail:   ['Detail ID','Invoice No','Dealer Code','Order Type','Customer Name','Part Description','Part Number','HSN Code','Qty','Taxable Amount','Total Tax','Final Amount','Created On','Invoice Date'],
   Parts_Sale_Review_Queue: ['Queue ID','Invoice No','Invoice Date','Account Name','Account GSTIN','Order Type','Total Invoice Value','Suggested Dealer Code','Status','Assigned Dealer Code','Assigned By','Assigned On'],
 
   // ---- Stock / Inventory valuation feature -------------------------------
@@ -114,8 +123,11 @@ var SHEET_HEADERS = {
     'Invoice Requested On','Invoice Requested By',
     'ASC Invoice No','ASC Invoice Date','ASC Invoice Amount','Attachment Link','Uploaded On','Uploaded By',
     'Tally Entry Date','Verified By','Verified On','Ledger Entry ID','Remarks',
-    'Email Sent On','Email Recipients'
+    'Email Sent On','Email Recipients','Email Thread ID'
   ],
+  Import_File_Log: ['File Hash','File Name','Import Type','Uploaded On','Uploaded By','Data Till',
+    'Processed','Skipped','Updated','Reversed','Status','Error'],
+  App_Settings: ['Key','Value','Updated On','Updated By'],
   Commission_Report_Line: [
     'Line ID','Report ID','Dealer Code','Month','Invoice No','Invoice Date','Frame No',
     'Model Variant','Customer Name','Vehicle Com','Registration Type','Registration Amount',
@@ -244,5 +256,68 @@ var COMMISSION_EMAIL_CC = [
   'sales@horizonauto.in'
 ];
 
+// Blank space left at the top and bottom of the commission invoice for the
+// ASC's own pre-printed letterhead. Used for the PDF and as the starting
+// value in the print window, where it can still be nudged before printing.
+var COMMISSION_LETTERHEAD_TOP_MM = 55;
+var COMMISSION_LETTERHEAD_BOTTOM_MM = 35;
+
 // Linked from the email's call-to-action button.
 var COMMISSION_PORTAL_URL = 'https://horizon-auto-network-connect.pages.dev';
+
+
+// ---- Portal file import --------------------------------------------------
+/**
+ * What each upload type needs. "required" columns must be present (matched
+ * ignoring case and extra spaces, in any order) or the whole file is
+ * rejected with the missing names listed — a missing column used to mean
+ * silently blank values, not an error. "dateColumn" is what "data till"
+ * is read from; Stock has none, so its as-of date is the upload date.
+ */
+var IMPORT_TYPES = {
+  INTER_DEALER: {
+    label: 'Inter-dealer sale (AD)',
+    logFolder: 'Inter_Dealer',
+    required: ['Invoice Number', 'Status', 'Requesting Network Code', 'Invoice Date', 'Frame #', 'Model Variant', 'Total Amount'],
+    optional: ['Color', 'Customer Name', 'Customer First Name', 'Customer Middle Name', 'Customer Last Name',
+               'Dealer Billing Price', 'Model Category', 'Taxable Value'],
+    dateColumn: 'Invoice Date'
+  },
+  VEHICLE_SALE: {
+    label: 'Vehicle sale (ASC)',
+    logFolder: 'Vehicle_Sale',
+    required: ['Invoice #', 'Status', 'Assigned To (DSE) Name', 'Invoice Date', 'Frame #', 'Model Variant', 'Total Invoice Amount'],
+    optional: ['Model Name', 'Color', 'Customer Name', 'Purchase Type', 'Financier', 'Hypothecation', 'Finance Amount'],
+    dateColumn: 'Invoice Date'
+  },
+  PARTS: {
+    label: 'Parts sale',
+    logFolder: 'Parts',
+    required: ['Invoice Number', 'Invoice Date', 'Network Type', 'Account GSTIN', 'Account Name', 'Final Line Item Invoice Amt'],
+    optional: ['Order Type', 'Customer Name', 'Part / Labour Description', 'Part / Labour Number', 'HSN / SAC Code',
+               'QTY Shipped', 'Taxable Amount', 'Total Tax'],
+    dateColumn: 'Invoice Date'
+  },
+  STOCK: {
+    label: 'Vehicle stock',
+    logFolder: 'Stock',
+    required: ['Inventory Location', 'Physical Status', 'Frame #', 'Model Variant'],
+    optional: ['Color'],
+    dateColumn: null
+  }
+};
+
+// Apps Script has a hard 6-minute limit per request. Files this big are
+// refused up front with a clear message instead of failing half-way.
+var IMPORT_MAX_BYTES = 8 * 1024 * 1024;
+
+// ---- Ledger --------------------------------------------------------------
+// Heads allowed in Bulk ledger entry, and which side each one posts to.
+var BULK_ENTRY_HEADS = {
+  'Interest':   'Debit',   // charged to the dealer
+  'Commission': 'Credit'   // paid to the dealer
+};
+
+// A payment matching an earlier one on dealer, amount, date and reference
+// asks for confirmation instead of being added silently.
+var PAYMENT_DUPLICATE_STATUSES = { 'Pending': true, 'Approved': true };

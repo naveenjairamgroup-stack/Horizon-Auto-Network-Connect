@@ -1,0 +1,32 @@
+<div class="card">
+  <h2>Bulk ledger entry</h2>
+  <p class="muted">
+    Post Interest or Commission to many dealers at once, each with its own amount.
+    Everything is checked first — if any row has a problem, nothing is posted and every problem is listed.
+    Commission for a month that the Commission module has already posted for a dealer is refused, so it can't be paid twice.
+  </p>
+  <div class="filter-row">
+    <div>
+      <label>Head</label>
+      <select id="bulk-head" onchange="onBulkHeadChange()">
+        <option value="Interest">Interest (debit — charged to dealer)</option>
+        <option value="Commission">Commission (credit — paid to dealer)</option>
+      </select>
+    </div>
+    <div><label>Date</label><input id="bulk-date" type="date"></div>
+    <div style="flex:2; min-width:240px;"><label>Remarks for all rows (optional)</label><input id="bulk-remarks" placeholder="e.g. Interest for July 2026"></div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:38%">Dealer</th><th>Amount (&#8377;)</th><th>Invoice / ref. (optional)</th><th>Remarks (optional)</th><th></th></tr></thead>
+    <tbody id="bulk-rows"></tbody>
+    <tfoot><tr><td style="text-align:right;"><strong>Total</strong></td><td><strong id="bulk-total">&#8377;0.00</strong></td><td colspan="3" id="bulk-count" class="muted"></td></tr></tfoot>
+  </table>
+  <div style="margin-top:10px;">
+    <button type="button" onclick="addBulkRow()">+ Add dealer</button>
+    <button type="button" onclick="addAllBulkDealers()">Add all dealers</button>
+    <button type="button" onclick="clearBulkRows()">Clear</button>
+    <button type="button" id="bulk-post-btn" onclick="postBulkEntries(this)" style="float:right;">Post all</button>
+  </div>
+  <div id="bulk-result" style="margin-top:14px;"></div>
+</div>

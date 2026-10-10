@@ -37,8 +37,18 @@ function runStockImport_(actor) {
 
   // Snapshot, not a transaction log — only the newest file matters, and it fully replaces prior state.
   var file = files[0];
-  var fileDate = file.getLastUpdated(); // best available proxy for "the date this was exported"
-  var rows = readTsvUtf16File_(file);
+  var c = processStockRows_(readTsvUtf16File_(file), file.getLastUpdated());
+  logImportRun_(file.getName(), 'Stock', c.processed, c.skipped, 0, 0, 'Success');
+  return { folder: 'Stock', files: files.length, processed: c.processed, skipped: c.skipped, updated: 0, reversed: 0 };
+}
+
+/**
+ * One stock snapshot, already parsed. Shared by the Drive importer and the
+ * portal upload. fileDate is the "as of" date written on each dealer's Total
+ * Stock ledger row — the file's export date from Drive, or the upload date
+ * from the portal.
+ */
+function processStockRows_(rows, fileDate) {
   var countable = rows.filter(function (r) { return STOCK_COUNTABLE_PHYSICAL_STATUSES[r['Physical Status']]; });
   var grouped = groupBy_(countable, 'Inventory Location');
 
@@ -89,8 +99,7 @@ function runStockImport_(actor) {
     postOrReplaceTotalStockLedgerRow_(d['Dealer Code'], totalsByDealer[d['Dealer Code']] || 0, fileDate);
   });
 
-  logImportRun_(file.getName(), 'Stock', processed, skipped, 0, 0, 'Success');
-  return { folder: 'Stock', files: files.length, processed: processed, skipped: skipped, updated: 0, reversed: 0 };
+  return { processed: processed, skipped: skipped, updated: 0, reversed: 0 };
 }
 
 /**

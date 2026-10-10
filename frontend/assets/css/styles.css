@@ -79,3 +79,33 @@
   border-bottom-color: #c8102e;
   font-weight: 600;
 }
+
+/* ---- Sidebar counts ---------------------------------------------------- */
+.sidebar a { position: relative; }
+.nav-count {
+  float: right;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #c8102e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 18px;
+}
+.nav-count.nav-count-zero { background: #e2e2e2; color: #777; font-weight: 600; }
+
+/* ---- Filter strip ------------------------------------------------------ */
+.filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.filter-row > div { display: flex; flex-direction: column; min-width: 140px; }
+.filter-row label { font-size: 12px; color: #666; }
+
+/* ---- Review / import cards -------------------------------------------- */
+.review-group { border: 1px solid #e5e5e5; border-left: 3px solid #c8102e; border-radius: 4px; padding: 12px 14px; margin-bottom: 14px; }
+.review-group h4 { margin: 0 0 4px; font-size: 14px; }
+.review-meta { font-size: 12px; color: #666; margin-bottom: 8px; }
+.review-group tr.suggested td { background: #fff4f5; }
+.import-error { background: #fff4f5; border: 1px solid #f3c1c8; color: #8a1023; padding: 10px 12px; border-radius: 4px; font-size: 13px; white-space: pre-wrap; }
+.import-ok { background: #f1f8f2; border: 1px solid #c4e2c8; color: #1f5f27; padding: 10px 12px; border-radius: 4px; font-size: 13px; }
+.muted { color: #888; font-size: 12px; }

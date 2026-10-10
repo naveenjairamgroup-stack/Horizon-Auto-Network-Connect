@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { jsArg_, formatMoney_, formatDateDisplay_, showToast_ } from '../utils.js';
+import { jsArg_, formatMoney_, formatDateDisplay_, showToast_, esc_, currentMonthRange_, todayIst_ } from '../utils.js';
 
 export function loadDealerDropdowns() {
   api('listDealers', session.token).then(function (dealers) {
@@ -20,12 +20,56 @@ export function onLedgerDealerChange() {
   loadLedger(document.getElementById('ledger-dealer-select').value);
 }
 
+var currentDealer = '';
+var rangeInitialised = false;
+
+/**
+ * Sets the From/To boxes. 'month' (the default every time the ledger opens),
+ * 'fy' (1 April to today) or 'all' (both blank = whole ledger).
+ */
+export function setLedgerRange(which) {
+  var f = document.getElementById('ledger-from');
+  var t = document.getElementById('ledger-to');
+  if (which === 'all') { f.value = ''; t.value = ''; }
+  else if (which === 'fy') {
+    var today = todayIst_();
+    var y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+    f.value = (m >= 4 ? y : y - 1) + '-04-01';
+    t.value = today;
+  } else {
+    var r = currentMonthRange_();
+    f.value = r.from; t.value = r.to;
+  }
+  if (currentDealer) loadLedger(currentDealer);
+}
+
+export function applyLedgerRange() {
+  var f = document.getElementById('ledger-from').value;
+  var t = document.getElementById('ledger-to').value;
+  if (f && t && f > t) { showToast_(new Error('"From" date is after the "To" date.')); return; }
+  if (currentDealer) loadLedger(currentDealer);
+}
+
 export function loadLedger(dealerCode) {
   if (!dealerCode) return;
+  // First open of the session defaults to this month; after that, switching
+  // dealer keeps whatever range the user picked.
+  if (!rangeInitialised) {
+    var r0 = currentMonthRange_();
+    document.getElementById('ledger-from').value = r0.from;
+    document.getElementById('ledger-to').value = r0.to;
+    rangeInitialised = true;
+  }
+  currentDealer = dealerCode;
+  var from = document.getElementById('ledger-from').value;
+  var to = document.getElementById('ledger-to').value;
+  document.getElementById('ledger-range-label').textContent =
+    (from || to) ? ('Showing ' + (from ? formatDateDisplay_(from + 'T00:00:00+05:30') : 'start') + ' to ' +
+      (to ? formatDateDisplay_(to + 'T00:00:00+05:30') : 'today')) : 'Showing all time';
   if (document.getElementById('entry-dealer-code')) document.getElementById('entry-dealer-code').value = dealerCode;
   if (document.getElementById('ob-dealer-code')) document.getElementById('ob-dealer-code').value = dealerCode;
 
-  api('getLedger', session.token, dealerCode).then(function (rows) {
+  api('getLedger', session.token, dealerCode, from, to).then(function (rows) {
     var tbody = document.getElementById('ledger-table-body');
     tbody.innerHTML = '';
     var invoiceDetailHeads = ['Vehicle Sale', 'Parts Sale', 'Finance Company Advance'];
@@ -37,8 +81,9 @@ export function loadLedger(dealerCode) {
       } else if (invoiceDetailHeads.indexOf(r.Head) !== -1 && r['Invoice No']) {
         viewBtn = '<button class="link-btn" onclick="openDetailModal(' + jsArg_(r['Invoice No']) + ',' + jsArg_(dealerCode) + ',' + jsArg_(r.Head) + ')">View</button>';
       }
-      tr.innerHTML = '<td>' + formatDateDisplay_(r['Invoice Date'] || r.Date) + '</td><td>' + r.Head + '</td><td>' + (r['Invoice No'] || '') + '</td>' +
-        '<td>' + (r.Remarks || '') + '</td>' +
+      if (r.Head === 'Opening Balance') tr.style.fontWeight = '600';
+      tr.innerHTML = '<td>' + formatDateDisplay_(r['Invoice Date'] || r.Date) + '</td><td>' + esc_(r.Head) + '</td><td>' + esc_(r['Invoice No'] || '') + '</td>' +
+        '<td>' + esc_(r.Remarks || '') + '</td>' +
         '<td>' + (Number(r.Debit) ? formatMoney_(r.Debit) : '') + '</td>' +
         '<td>' + (Number(r.Credit) ? formatMoney_(r.Credit) : '') + '</td>' +
         '<td>' + formatMoney_(r['Running Balance']) + '</td>' +

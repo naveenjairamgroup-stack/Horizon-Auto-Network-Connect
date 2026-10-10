@@ -2,7 +2,7 @@
   <h2>Submit payment</h2>
   <form id="new-payment-form">
     <div class="form-row">
-      <div><label>Dealer code</label><input id="pay-dealer-code" required></div>
+      <div style="flex:2"><label>Dealer</label><select id="pay-dealer-code" required></select></div>
       <div>
         <label>Mode</label>
         <select id="pay-mode">
@@ -17,12 +17,31 @@
       <div><label>Reference no.</label><input id="pay-reference"></div>
       <div style="flex:2"><label>Remarks</label><input id="pay-remarks"></div>
     </div>
-    <button type="submit">Submit for approval</button>
+    <button type="submit" id="pay-submit-btn">Submit for approval</button>
   </form>
 </div>
 
 <div class="card">
   <h2>Payments</h2>
+  <div class="filter-row">
+    <div><label>From</label><input id="payf-from" type="date"></div>
+    <div><label>To</label><input id="payf-to" type="date"></div>
+    <div id="payf-dealer-wrap" style="min-width:220px;"><label>Dealer</label><select id="payf-dealer"></select></div>
+    <div>
+      <label>Status</label>
+      <select id="payf-status"><option value="">All</option><option>Pending</option><option>Approved</option><option>Rejected</option></select>
+    </div>
+    <div>
+      <label>Mode</label>
+      <select id="payf-mode">
+        <option value="">All</option><option>Cash</option><option>NEFT</option><option>RTGS</option><option>UPI</option>
+        <option>Adjustment</option><option>Credit Note</option>
+      </select>
+    </div>
+    <div><button type="button" onclick="loadPayments()">Apply</button></div>
+    <div><button type="button" onclick="clearPaymentFilters()">Clear</button></div>
+  </div>
+  <div id="payf-summary" class="muted" style="margin-bottom:8px;"></div>
   <table>
     <thead><tr><th>Dealer code</th><th>Dealer name</th><th>Mode</th><th>Amount</th><th>Reference no.</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="payment-table-body"></tbody>

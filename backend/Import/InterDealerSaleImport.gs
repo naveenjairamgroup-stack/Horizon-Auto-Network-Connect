@@ -14,25 +14,24 @@
 
 function runInterDealerSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.INTER_DEALER);
-  var processed = 0, skipped = 0, updated = 0, reversed = 0;
-
+  var total = newCounts_();
   files.forEach(function (file) {
-    var rows = readTsvUtf16File_(file);
-    var grouped = groupBy_(rows, 'Invoice Number');
-
-    grouped.order.forEach(function (invoiceNo) {
-      var frames = grouped.groups[invoiceNo];
-      var result = processInterDealerInvoice_(invoiceNo, frames);
-      if (result === 'processed') processed++;
-      else if (result === 'skipped') skipped++;
-      else if (result === 'updated') updated++;
-      else if (result === 'reversed') reversed++;
-    });
-
-    logImportRun_(file.getName(), 'Inter_Dealer', processed, skipped, updated, reversed, 'Success');
+    var c = processInterDealerRows_(readTsvUtf16File_(file));
+    logImportRun_(file.getName(), 'Inter_Dealer', c.processed, c.skipped, c.updated, c.reversed, 'Success');
+    addCounts_(total, c);
   });
+  return { folder: 'Inter_Dealer', files: files.length, processed: total.processed, skipped: total.skipped, updated: total.updated, reversed: total.reversed };
+}
 
-  return { folder: 'Inter_Dealer', files: files.length, processed: processed, skipped: skipped, updated: updated, reversed: reversed };
+/** One file's rows, already parsed. Shared by the Drive importer and the portal upload. */
+function processInterDealerRows_(rows) {
+  var c = newCounts_();
+  var grouped = groupBy_(rows, 'Invoice Number');
+  grouped.order.forEach(function (invoiceNo) {
+    var result = processInterDealerInvoice_(invoiceNo, grouped.groups[invoiceNo]);
+    if (c[result] !== undefined) c[result]++;
+  });
+  return c;
 }
 
 function processInterDealerInvoice_(invoiceNo, frames) {
@@ -50,8 +49,8 @@ function processInterDealerInvoice_(invoiceNo, frames) {
   if (allCancelled) {
     if (!alreadyImported) return 'skipped'; // was never imported (e.g. cancelled same day it was booked) — nothing to reverse
     var oldTotal = existingDetail.reduce(function (s, d) { return s + parseAmount_(d['Frame Total Amount']); }, 0);
-    reverseLedgerEntry_('Vehicle Sale', dealerCode, invoiceNo, oldTotal, true, 'Reversed — Inter Dealer Sale invoice ' + invoiceNo + ' shows Cancelled');
-    return 'reversed';
+    var did = reverseLedgerEntry_('Vehicle Sale', dealerCode, invoiceNo, oldTotal, true, 'Reversed — Inter Dealer Sale invoice ' + invoiceNo + ' shows Cancelled');
+    return did ? 'reversed' : 'skipped'; // false = already reversed by an earlier import
   }
 
   if (!allNew) return 'skipped'; // mixed/unexpected status within one invoice — needs a human look, don't guess

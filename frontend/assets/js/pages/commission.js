@@ -12,7 +12,7 @@ import { api } from '../api.js';
 import { session } from '../session.js';
 import {
   jsArg_, formatMoney_, formatDateDisplay_, formatDateTimeDisplay_,
-  showToast_, statusBadge_, readFileAsBase64_, esc_
+  showToast_, statusBadge_, readFileAsBase64_, esc_, withBusy_
 } from '../utils.js';
 
 var ratesCache = [];
@@ -257,8 +257,10 @@ export function handleCommissionUpload(event) {
     return api('uploadAttachment', session.token, base64, file.name, file.type);
   }).then(function (uploaded) {
     return api('uploadCommissionInvoice', session.token, reportId, invoiceNo, invoiceDate, amount, uploaded.url);
-  }).then(function () {
-    showToast_(null, 'Invoice uploaded. Accounts verify karega.');
+  }).then(function (res) {
+    var mailNote = (res && res.mailed) ? ' Email thread pe reply chala gaya.'
+      : ((res && res.mailError) ? ' (Email nahi gaya: ' + res.mailError + ')' : '');
+    showToast_(null, 'Invoice uploaded. Accounts verify karega.' + mailNote);
     closeCommissionUpload();
     loadCommissionReports();
   }).catch(function (err) { showToast_(err); });
@@ -576,7 +578,43 @@ export function handleSaveCommissionRate(event) {
 }
 
 // ============================================================= SETTINGS ==
+// ------------------------------------------------- Email & import settings ----
+export function loadAppSettings() {
+  var box = document.getElementById('cm-app-settings');
+  if (!box) return;
+  api('listSettings', session.token).then(function (rows) {
+    var groups = {};
+    (rows || []).forEach(function (r) { (groups[r.group] = groups[r.group] || []).push(r); });
+    box.innerHTML = Object.keys(groups).map(function (g) {
+      return '<h4 style="margin:14px 0 6px;">' + esc_(g) + '</h4>' + groups[g].map(function (r) {
+        var id = 'set-' + r.key;
+        var input = r.type === 'bool'
+          ? '<select id="' + id + '"><option value="false"' + (r.value !== 'true' ? ' selected' : '') + '>Off</option>' +
+            '<option value="true"' + (r.value === 'true' ? ' selected' : '') + '>On</option></select>'
+          : '<input id="' + id + '" value="' + esc_(r.value) + '" style="width:100%;">';
+        var by = r.isDefault ? '<span class="muted">default</span>'
+          : '<span class="muted">changed ' + formatDateTimeDisplay_(r.updatedOn) + ' by ' + esc_(r.updatedBy) + '</span>';
+        return '<div class="form-row" style="align-items:flex-end;">' +
+          '<div style="flex:1; min-width:150px;"><label>' + esc_(r.label) + '</label><div class="muted">' + esc_(r.hint) + '</div></div>' +
+          '<div style="flex:2;">' + input + '<div>' + by + '</div></div>' +
+          '<div><button type="button" onclick="saveAppSetting(this,' + jsArg_(r.key) + ')">Save</button></div></div>';
+      }).join('');
+    }).join('');
+  }).catch(function (err) { showToast_(err); });
+}
+
+export function saveAppSetting(button, key) {
+  var el = document.getElementById('set-' + key);
+  withBusy_(button, function () {
+    return api('saveSetting', session.token, key, el.value).then(function (r) {
+      showToast_(null, 'Saved.');
+      loadAppSettings();
+    });
+  }).catch(function (err) { showToast_(err); });
+}
+
 export function loadCommissionConfig() {
+  loadAppSettings();
   api('listCommissionConfig', session.token).then(function (rows) {
     var tbody = document.getElementById('cm-config-table-body');
     tbody.innerHTML = '';

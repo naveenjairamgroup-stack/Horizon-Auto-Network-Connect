@@ -18,6 +18,27 @@ function submitPayment(token, payment) {
     }
     var amount = Math.abs(Number(payment.Amount) || 0);
     if (amount === 0) throw new Error('Amount must be greater than zero.');
+
+    // A payment that matches an existing Pending/Approved one on dealer,
+    // amount, date and reference is far more likely a repeat than a second
+    // genuine payment — so ask, rather than add it silently. The frontend
+    // re-sends with payment.force = true once the user confirms. (Double
+    // clicks and proxy retries are already absorbed earlier, by the request
+    // de-duplication in Code.gs; this catches the "submitted it again by
+    // hand" case.)
+    if (!payment.force) {
+      var match = findDuplicatePayment_(payment['Dealer Code'], amount, payment.Date, payment['Reference No']);
+      if (match) {
+        return {
+          needsConfirm: true,
+          message: 'A payment of ' + formatCurrency(amount) + ' for this dealer on this date' +
+            (payment['Reference No'] ? ' with reference ' + payment['Reference No'] : '') +
+            ' already exists (' + match['Approval Status'] + ', ' + match['Payment ID'] + '). Add it again anyway?',
+          existingId: match['Payment ID']
+        };
+      }
+    }
+
     var row = {
       'Payment ID': generateId('PAY'),
       'Dealer Code': payment['Dealer Code'],
@@ -38,15 +59,51 @@ function submitPayment(token, payment) {
   });
 }
 
-function listPayments(token, filterStatus) {
+/**
+ * Pending/Approved payment with the same dealer, amount and date — and the
+ * same reference, when one was given. Two cash payments of the same amount
+ * on the same day are rare but real, so this only ever prompts, never blocks.
+ */
+function findDuplicatePayment_(dealerCode, amount, date, referenceNo) {
+  var day = Utilities.formatDate(istDayStart_(date), 'Asia/Kolkata', 'yyyy-MM-dd');
+  var ref = String(referenceNo || '').trim().toUpperCase();
+  var rows = getAllRows(SHEETS.PAYMENT_ENTRIES);
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (String(r['Dealer Code']) !== String(dealerCode)) continue;
+    if (!PAYMENT_DUPLICATE_STATUSES[r['Approval Status']]) continue;
+    if (Math.abs((Number(r.Amount) || 0) - amount) > 0.005) continue;
+    var rDay = r.Date ? Utilities.formatDate(new Date(r.Date), 'Asia/Kolkata', 'yyyy-MM-dd') : '';
+    if (rDay !== day) continue;
+    var rRef = String(r['Reference No'] || '').trim().toUpperCase();
+    if (ref && rRef && ref !== rRef) continue; // different references = different payments
+    return r;
+  }
+  return null;
+}
+
+/**
+ * filters: a status string (the old signature, still accepted), or
+ *   { status, dealerCode, mode, fromDate, toDate } — any combination, all optional.
+ */
+function listPayments(token, filters) {
   return safeRun('listPayments', function () {
     var session = requireRole_(token, PERMISSIONS.Payments.view);
+    var f = (typeof filters === 'string') ? { status: filters } : (filters || {});
     var rows = getAllRows(SHEETS.PAYMENT_ENTRIES);
     if (session.role === ROLES.DEALER) {
       rows = rows.filter(function (r) { return r['Dealer Code'] === session.dealerCode; });
     }
-    if (filterStatus) {
-      rows = rows.filter(function (r) { return r['Approval Status'] === filterStatus; });
+    if (f.status) rows = rows.filter(function (r) { return r['Approval Status'] === f.status; });
+    if (f.dealerCode) rows = rows.filter(function (r) { return String(r['Dealer Code']) === String(f.dealerCode); });
+    if (f.mode) rows = rows.filter(function (r) { return String(r.Mode) === String(f.mode); });
+    if (f.fromDate) {
+      var from = istDayStart_(f.fromDate);
+      rows = rows.filter(function (r) { return new Date(r.Date) >= from; });
+    }
+    if (f.toDate) {
+      var to = istDayEnd_(f.toDate);
+      rows = rows.filter(function (r) { return new Date(r.Date) <= to; });
     }
     // Payment_Entries only stores the code; the table shows the name next to it.
     var names = getDealerNameMap_();

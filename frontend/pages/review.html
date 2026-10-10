@@ -1,0 +1,13 @@
+<div class="card">
+  <h2>Review — duplicate ledger entries</h2>
+  <p class="muted">
+    Invoices that appear in a dealer's ledger more times than they should, across all dates.
+    Entries are grouped by dealer, invoice and head — so a financed vehicle's Vehicle Sale debit and
+    Finance Company Advance credit are never counted against each other.
+    The entries most likely to be the extra ones are pre-ticked; check them, then delete.
+    Deleting recalculates that dealer's running balance and is recorded in the audit log.
+  </p>
+  <button type="button" onclick="loadReview()">Refresh</button>
+  <div id="review-summary" style="margin:12px 0;"></div>
+  <div id="review-list"></div>
+</div>

@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { refreshSidebarCounts } from '../sidebar.js';
 import { session } from '../session.js';
 import { formatMoney_, statusBadge_, showToast_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
@@ -112,5 +113,6 @@ export function handleSubmitVehicleSaleReview(event) {
     closeVehicleSaleReviewForm();
     loadVehicleSaleReviews();
     loadDashboardSummary();
+    refreshSidebarCounts();
   }).catch(function (err) { showToast_(err); });
 }

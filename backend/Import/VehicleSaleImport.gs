@@ -24,24 +24,24 @@
 
 function runAscVehicleSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.VEHICLE_SALE);
-  var processed = 0, skipped = 0, updated = 0, reversed = 0;
-
+  var total = newCounts_();
   files.forEach(function (file) {
-    var rows = readTsvUtf16File_(file);
-    var grouped = groupBy_(rows, 'Invoice #');
-
-    grouped.order.forEach(function (invoiceNo) {
-      var frames = grouped.groups[invoiceNo];
-      var result = processAscVehicleInvoice_(invoiceNo, frames);
-      if (result === 'processed') processed++;
-      else if (result === 'skipped') skipped++;
-      else if (result === 'reversed') reversed++;
-    });
-
-    logImportRun_(file.getName(), 'Vehicle_Sale', processed, skipped, updated, reversed, 'Success');
+    var c = processAscVehicleRows_(readTsvUtf16File_(file));
+    logImportRun_(file.getName(), 'Vehicle_Sale', c.processed, c.skipped, c.updated, c.reversed, 'Success');
+    addCounts_(total, c);
   });
+  return { folder: 'Vehicle_Sale', files: files.length, processed: total.processed, skipped: total.skipped, updated: total.updated, reversed: total.reversed };
+}
 
-  return { folder: 'Vehicle_Sale', files: files.length, processed: processed, skipped: skipped, updated: updated, reversed: reversed };
+/** One file's rows, already parsed. Shared by the Drive importer and the portal upload. */
+function processAscVehicleRows_(rows) {
+  var c = newCounts_();
+  var grouped = groupBy_(rows, 'Invoice #');
+  grouped.order.forEach(function (invoiceNo) {
+    var result = processAscVehicleInvoice_(invoiceNo, grouped.groups[invoiceNo]);
+    if (c[result] !== undefined) c[result]++;
+  });
+  return c;
 }
 
 function processAscVehicleInvoice_(invoiceNo, frames) {
@@ -140,10 +140,22 @@ function listVehicleSaleReviews(token) {
         out['Dealer Name'] = names[r['Dealer Code']] || '';
         return out;
       })
-      .sort(function (a, b) { return new Date(b['Submitted On'] || 0) - new Date(a['Submitted On'] || 0); });
+      // Pending pehle — wahi rows hain jinpe kaam baaki hai, aur unhe dhundhne
+      // ke liye neeche scroll karna padta tha. Har status ke andar newest
+      // first. Pending rows ka 'Submitted On' khaali hota hai (wo submit ke
+      // waqt bharta hai), isliye unke liye 'Created On' fallback use hota hai
+      // — warna sab 0 ban ke aapas me random order me aa jaate.
+      .sort(function (a, b) {
+        var rank = { 'Pending': 0, 'Submitted': 1, 'Cancelled': 2 };
+        var ra = rank[String(a.Status)] === undefined ? 3 : rank[String(a.Status)];
+        var rb = rank[String(b.Status)] === undefined ? 3 : rank[String(b.Status)];
+        if (ra !== rb) return ra - rb;
+        var da = new Date(a['Submitted On'] || a['Created On'] || 0);
+        var db = new Date(b['Submitted On'] || b['Created On'] || 0);
+        return db - da;
+      });
   });
 }
-
 /**
  * Submits (first time) or edits (within the window) a Network Manager's
  * review of an ASC vehicle-sale invoice. formData:

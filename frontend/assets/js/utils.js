@@ -101,3 +101,34 @@ export function readFileAsBase64_(file) {
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Disables a button for as long as the promise it starts is running, so a
+ * double click can't fire the same submit twice. (The backend also drops
+ * identical repeats; this is the first line of defence and gives feedback.)
+ * Usage: withBusy_(btn, function () { return api(...); })
+ */
+export function withBusy_(button, run) {
+  if (button && button.disabled) return Promise.resolve();
+  var label = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = 'Please wait\u2026'; }
+  var done = function () { if (button) { button.disabled = false; button.textContent = label; } };
+  var p;
+  try { p = Promise.resolve(run()); } catch (e) { done(); return Promise.reject(e); }
+  return p.then(function (v) { done(); return v; }, function (e) { done(); throw e; });
+}
+
+/** First and last day of the current month as 'YYYY-MM-DD', India time. */
+export function currentMonthRange_() {
+  var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).reduce(function (a, x) { a[x.type] = x.value; return a; }, {});
+  var last = new Date(Number(p.year), Number(p.month), 0).getDate();
+  return { from: p.year + '-' + p.month + '-01', to: p.year + '-' + p.month + '-' + String(last).padStart(2, '0') };
+}
+
+/** Today as 'YYYY-MM-DD' in India time (toISOString() gives UTC, which is yesterday before 05:30 IST). */
+export function todayIst_() {
+  var p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).reduce(function (a, x) { a[x.type] = x.value; return a; }, {});
+  return p.year + '-' + p.month + '-' + p.day;
+}

@@ -48,6 +48,7 @@ function setupDatabase() {
   seedVoucherHeads_();
   seedFirstAdmin_();
   seedCommissionConfig_();
+  ensureVoucherHead_('Interest');
   Logger.log('Database setup complete.');
 }
 

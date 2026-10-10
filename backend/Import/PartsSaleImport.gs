@@ -23,30 +23,30 @@
 
 function runPartsSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.PARTS);
-  var processed = 0, skipped = 0, updated = 0, reversed = 0;
-
+  var total = newCounts_();
   files.forEach(function (file) {
-    var allRows = readCsvUtf8File_(file);
-    var mainDealerRows = allRows.filter(function (r) { return r['Network  Type'] === 'Main Dealer' || r['Network Type'] === 'Main Dealer'; });
-    var grouped = groupBy_(mainDealerRows, 'Invoice Number');
-
-    grouped.order.forEach(function (invoiceNo) {
-      var lines = grouped.groups[invoiceNo];
-      var result = processPartsInvoice_(invoiceNo, lines);
-      if (result === 'processed') processed++;
-      else if (result === 'skipped') skipped++;
-      else if (result === 'updated') updated++;
-      else if (result === 'review') skipped++; // counted as handled, not a duplicate-skip, but no separate column for it — see Parts_Sale_Review_Queue directly
-    });
-
-    // Cancellation-by-diff check, scoped to this file's own invoice date range.
-    var reversedThisFile = detectAndReverseMissingPartsInvoices_(mainDealerRows);
-    reversed += reversedThisFile;
-
-    logImportRun_(file.getName(), 'Parts', processed, skipped, updated, reversed, 'Success');
+    var c = processPartsRows_(readCsvUtf8File_(file));
+    logImportRun_(file.getName(), 'Parts', c.processed, c.skipped, c.updated, c.reversed, 'Success');
+    addCounts_(total, c);
   });
+  return { folder: 'Parts', files: files.length, processed: total.processed, skipped: total.skipped, updated: total.updated, reversed: total.reversed };
+}
 
-  return { folder: 'Parts', files: files.length, processed: processed, skipped: skipped, updated: updated, reversed: reversed };
+/** One file's rows, already parsed. Shared by the Drive importer and the portal upload. */
+function processPartsRows_(allRows) {
+  var c = newCounts_();
+  var mainDealerRows = allRows.filter(function (r) {
+    return r['Network  Type'] === 'Main Dealer' || r['Network Type'] === 'Main Dealer';
+  });
+  var grouped = groupBy_(mainDealerRows, 'Invoice Number');
+  grouped.order.forEach(function (invoiceNo) {
+    var result = processPartsInvoice_(invoiceNo, grouped.groups[invoiceNo]);
+    if (result === 'review') c.skipped++; // routed to Parts review — counted as handled
+    else if (c[result] !== undefined) c[result]++;
+  });
+  // Cancellation-by-diff, scoped to this file's own invoice date range.
+  c.reversed += detectAndReverseMissingPartsInvoices_(mainDealerRows);
+  return c;
 }
 
 function processPartsInvoice_(invoiceNo, lines) {
@@ -121,7 +121,8 @@ function appendPartsSaleDetailRow_(invoiceNo, dealerCode, line) {
     'Taxable Amount': parseAmount_(line['Taxable Amount']),
     'Total Tax': parseAmount_(line['Total Tax']),
     'Final Amount': parseAmount_(line['Final Line Item Invoice Amt']),
-    'Created On': new Date()
+    'Created On': new Date(),
+    'Invoice Date': line['Invoice Date'] ? parseInvoiceDate_(line['Invoice Date']) : ''
   }, 'System (Import)');
 }
 
@@ -154,9 +155,29 @@ function queuePartsSaleForReview_(invoiceNo, first, lines, suggestedDealerCode) 
  * own min/max Invoice Date against the invoice numbers actually present in
  * the file. Only reverses if the match ratio clears the configured threshold.
  */
+/**
+ * An invoice that was imported before but is missing from a newer report
+ * covering the same dates is treated as cancelled, and reversed.
+ *
+ * Two fixes over the original:
+ *  - The window is now compared invoice-date to invoice-date. It used to
+ *    compare the file's invoice dates against each detail row's Created On
+ *    (when it was IMPORTED), so an invoice dated 31 Jul but imported on 1 Aug
+ *    sat inside an August file's window, was "missing" from it, and got
+ *    reversed even though it was never cancelled. File dates were also read
+ *    with new Date(), which reads 05/08/2026 as May 8th.
+ *  - Detail rows written before the Invoice Date column existed have no date
+ *    to compare, so they are left out of this check entirely rather than
+ *    guessed at. A missed auto-cancel is recoverable by hand; a false one
+ *    silently takes money off a dealer.
+ * The reversal itself is idempotent (see reverseLedgerEntry_), so a re-upload
+ * never reverses the same invoice twice.
+ */
 function detectAndReverseMissingPartsInvoices_(mainDealerRows) {
   if (mainDealerRows.length === 0) return 0;
-  var dates = mainDealerRows.map(function (r) { return new Date(r['Invoice Date']); }).filter(function (d) { return !isNaN(d); });
+  var dates = mainDealerRows
+    .map(function (r) { return r['Invoice Date'] ? parseInvoiceDate_(r['Invoice Date']) : null; })
+    .filter(function (d) { return d && !isNaN(d.getTime()); });
   if (dates.length === 0) return 0;
   var minDate = new Date(Math.min.apply(null, dates));
   var maxDate = new Date(Math.max.apply(null, dates));
@@ -167,7 +188,8 @@ function detectAndReverseMissingPartsInvoices_(mainDealerRows) {
   var existingDetailRows = getAllRows(SHEETS.PARTS_SALE_DETAIL);
   var existingInvoiceNumbers = {};
   existingDetailRows.forEach(function (d) {
-    var dt = new Date(d['Created On']);
+    if (!d['Invoice Date']) return; // written before this column existed — see note above
+    var dt = parseInvoiceDate_(d['Invoice Date']);
     if (dt >= minDate && dt <= maxDate) existingInvoiceNumbers[d['Invoice No']] = true;
   });
 
@@ -177,7 +199,8 @@ function detectAndReverseMissingPartsInvoices_(mainDealerRows) {
   var matchedCount = existingList.filter(function (inv) { return fileInvoiceNumbers[inv]; }).length;
   var matchRatio = matchedCount / existingList.length;
   if (matchRatio < PARTS_CANCEL_MATCH_THRESHOLD) {
-    Logger.log('Parts cancellation-by-diff skipped: match ratio ' + (matchRatio * 100).toFixed(1) + '% is below the ' + (PARTS_CANCEL_MATCH_THRESHOLD * 100) + '% safety threshold. No invoices auto-reversed — check the uploaded file.');
+    Logger.log('Parts cancellation-by-diff skipped: match ratio ' + (matchRatio * 100).toFixed(1) + '% is below the ' +
+      (PARTS_CANCEL_MATCH_THRESHOLD * 100) + '% safety threshold. No invoices auto-reversed — check the uploaded file.');
     return 0;
   }
 
@@ -188,8 +211,10 @@ function detectAndReverseMissingPartsInvoices_(mainDealerRows) {
     if (rowsForInvoice.length === 0) return;
     var dealerCode = rowsForInvoice[0]['Dealer Code'];
     var amount = rowsForInvoice.reduce(function (s, d) { return s + Number(d['Final Amount'] || 0); }, 0);
-    reverseLedgerEntry_('Parts Sale', dealerCode, invoiceNo, amount, true, 'Reversed — Parts invoice ' + invoiceNo + ' no longer appears in Sales Tax Report for this period (treated as cancelled)');
-    reversedCount++;
+    if (reverseLedgerEntry_('Parts Sale', dealerCode, invoiceNo, amount, true,
+        'Reversed — Parts invoice ' + invoiceNo + ' no longer appears in Sales Tax Report for this period (treated as cancelled)')) {
+      reversedCount++;
+    }
   });
   return reversedCount;
 }

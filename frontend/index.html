@@ -192,6 +192,15 @@
       <div><span class="badge badge-green" id="ledger-credit-badge">&mdash;</span></div>
     </div>
   </div>
+  <div class="filter-row">
+    <div><label>From</label><input id="ledger-from" type="date"></div>
+    <div><label>To</label><input id="ledger-to" type="date"></div>
+    <div><button type="button" onclick="applyLedgerRange()">Show</button></div>
+    <div><button type="button" onclick="setLedgerRange('month')">This month</button></div>
+    <div><button type="button" onclick="setLedgerRange('fy')">This FY</button></div>
+    <div><button type="button" onclick="setLedgerRange('all')">All time</button></div>
+    <div id="ledger-range-label" class="muted" style="align-self:center;"></div>
+  </div>
   <table>
     <thead><tr><th>Date</th><th>Head</th><th>Invoice no.</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Running balance</th><th></th></tr></thead>
     <tbody id="ledger-table-body"></tbody>
@@ -271,7 +280,7 @@
   <h2>Submit payment</h2>
   <form id="new-payment-form">
     <div class="form-row">
-      <div><label>Dealer code</label><input id="pay-dealer-code" required></div>
+      <div style="flex:2"><label>Dealer</label><select id="pay-dealer-code" required></select></div>
       <div>
         <label>Mode</label>
         <select id="pay-mode">
@@ -286,12 +295,31 @@
       <div><label>Reference no.</label><input id="pay-reference"></div>
       <div style="flex:2"><label>Remarks</label><input id="pay-remarks"></div>
     </div>
-    <button type="submit">Submit for approval</button>
+    <button type="submit" id="pay-submit-btn">Submit for approval</button>
   </form>
 </div>
 
 <div class="card">
   <h2>Payments</h2>
+  <div class="filter-row">
+    <div><label>From</label><input id="payf-from" type="date"></div>
+    <div><label>To</label><input id="payf-to" type="date"></div>
+    <div id="payf-dealer-wrap" style="min-width:220px;"><label>Dealer</label><select id="payf-dealer"></select></div>
+    <div>
+      <label>Status</label>
+      <select id="payf-status"><option value="">All</option><option>Pending</option><option>Approved</option><option>Rejected</option></select>
+    </div>
+    <div>
+      <label>Mode</label>
+      <select id="payf-mode">
+        <option value="">All</option><option>Cash</option><option>NEFT</option><option>RTGS</option><option>UPI</option>
+        <option>Adjustment</option><option>Credit Note</option>
+      </select>
+    </div>
+    <div><button type="button" onclick="loadPayments()">Apply</button></div>
+    <div><button type="button" onclick="clearPaymentFilters()">Clear</button></div>
+  </div>
+  <div id="payf-summary" class="muted" style="margin-bottom:8px;"></div>
   <table>
     <thead><tr><th>Dealer code</th><th>Dealer name</th><th>Mode</th><th>Amount</th><th>Reference no.</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
     <tbody id="payment-table-body"></tbody>
@@ -304,7 +332,7 @@
   <h2>Submit vehicle / parts return</h2>
   <form id="new-return-form">
     <div class="form-row">
-      <div><label>Dealer code</label><input id="ret-dealer-code" required></div>
+      <div style="flex:2"><label>Dealer</label><select id="ret-dealer-code" required></select></div>
       <div>
         <label>Return type</label>
         <select id="ret-type" onchange="onReturnTypeChange()">
@@ -332,7 +360,7 @@
       <div><label>Total amount (&#8377;)</label><input id="ret-amount" type="number" step="0.01" required></div>
       <div style="flex:2"><label>Tax invoice copy (mandatory)</label><input id="ret-attachment" type="file" accept="image/*,.pdf" required></div>
     </div>
-    <button type="submit">Submit for approval</button>
+    <button type="submit" id="ret-submit-btn">Submit for approval</button>
   </form>
   <p style="color:#888; font-size:12px; margin-top:8px;">Invoices older than 7 days can only be entered by Admin or Accounts.</p>
 </div>
@@ -525,6 +553,15 @@
     </form>
   </div>
 
+  <div class="card" id="cm-app-settings-card">
+    <h2>Email &amp; import settings</h2>
+    <p style="color:#888; font-size:12px;">
+      Admin only. Who commission emails go to, and whether the old Drive folder import runs.
+      A blank value uses the built-in default shown.
+    </p>
+    <div id="cm-app-settings"></div>
+  </div>
+
   <div class="card" id="cm-pin-admin-card">
     <h2>Commission PIN</h2>
     <p style="color:#888; font-size:12px;">
@@ -636,10 +673,43 @@
         </div>
         <div id="page-Imports" class="page">
 <div class="card">
-  <h2>Drive Import</h2>
-  <p style="color:#888; font-size:12px;">Automatically runs daily at 12:00 and 16:00. Use this button to run it right now instead of waiting.</p>
-  <button onclick="handleImportNow()">Import Now</button>
-  <div id="import-now-result" style="margin-top:10px; font-size:13px;"></div>
+  <h2>Upload a DMS export</h2>
+  <p class="muted">
+    Upload the CSV exactly as exported from DMS. Columns can be in any order, but every required column must be there —
+    if one is missing the file is refused and the missing names are shown. The same file can't be imported twice.
+  </p>
+  <div class="filter-row">
+    <div>
+      <label>File type</label>
+      <select id="imp-type" onchange="onImportTypeChange()">
+        <option value="">— choose —</option>
+        <option value="VEHICLE_SALE">Vehicle sale (ASC)</option>
+        <option value="INTER_DEALER">Inter-dealer sale (AD)</option>
+        <option value="PARTS">Parts sale</option>
+        <option value="STOCK">Vehicle stock</option>
+      </select>
+    </div>
+    <div style="flex:2; min-width:260px;"><label>CSV file</label><input id="imp-file" type="file" accept=".csv,.txt,text/csv"></div>
+    <div><button type="button" id="imp-upload-btn" onclick="handleImportUpload(this)">Upload &amp; import</button></div>
+  </div>
+  <div id="imp-required" class="muted"></div>
+  <div id="imp-result" style="margin-top:12px;"></div>
+</div>
+
+<div class="card">
+  <h2>Data status</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Data till</th><th>Last uploaded</th><th>By</th><th>File</th></tr></thead>
+    <tbody id="imp-status-body"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Upload history</h2>
+  <table>
+    <thead><tr><th>Uploaded</th><th>Type</th><th>File</th><th>Data till</th><th>Processed</th><th>Skipped</th><th>Updated</th><th>Reversed</th><th>Status</th></tr></thead>
+    <tbody id="imp-history-body"></tbody>
+  </table>
 </div>
 
 <div class="card">
@@ -648,6 +718,57 @@
     <thead><tr><th>Time</th><th>Folder</th><th>File</th><th>Processed</th><th>Skipped</th><th>Updated</th><th>Reversed</th><th>Status</th></tr></thead>
     <tbody id="import-log-table-body"></tbody>
   </table>
+</div>
+
+        </div>
+        <div id="page-Review" class="page">
+<div class="card">
+  <h2>Review — duplicate ledger entries</h2>
+  <p class="muted">
+    Invoices that appear in a dealer's ledger more times than they should, across all dates.
+    Entries are grouped by dealer, invoice and head — so a financed vehicle's Vehicle Sale debit and
+    Finance Company Advance credit are never counted against each other.
+    The entries most likely to be the extra ones are pre-ticked; check them, then delete.
+    Deleting recalculates that dealer's running balance and is recorded in the audit log.
+  </p>
+  <button type="button" onclick="loadReview()">Refresh</button>
+  <div id="review-summary" style="margin:12px 0;"></div>
+  <div id="review-list"></div>
+</div>
+
+        </div>
+        <div id="page-BulkEntry" class="page">
+<div class="card">
+  <h2>Bulk ledger entry</h2>
+  <p class="muted">
+    Post Interest or Commission to many dealers at once, each with its own amount.
+    Everything is checked first — if any row has a problem, nothing is posted and every problem is listed.
+    Commission for a month that the Commission module has already posted for a dealer is refused, so it can't be paid twice.
+  </p>
+  <div class="filter-row">
+    <div>
+      <label>Head</label>
+      <select id="bulk-head" onchange="onBulkHeadChange()">
+        <option value="Interest">Interest (debit — charged to dealer)</option>
+        <option value="Commission">Commission (credit — paid to dealer)</option>
+      </select>
+    </div>
+    <div><label>Date</label><input id="bulk-date" type="date"></div>
+    <div style="flex:2; min-width:240px;"><label>Remarks for all rows (optional)</label><input id="bulk-remarks" placeholder="e.g. Interest for July 2026"></div>
+  </div>
+
+  <table>
+    <thead><tr><th style="width:38%">Dealer</th><th>Amount (&#8377;)</th><th>Invoice / ref. (optional)</th><th>Remarks (optional)</th><th></th></tr></thead>
+    <tbody id="bulk-rows"></tbody>
+    <tfoot><tr><td style="text-align:right;"><strong>Total</strong></td><td><strong id="bulk-total">&#8377;0.00</strong></td><td colspan="3" id="bulk-count" class="muted"></td></tr></tfoot>
+  </table>
+  <div style="margin-top:10px;">
+    <button type="button" onclick="addBulkRow()">+ Add dealer</button>
+    <button type="button" onclick="addAllBulkDealers()">Add all dealers</button>
+    <button type="button" onclick="clearBulkRows()">Clear</button>
+    <button type="button" id="bulk-post-btn" onclick="postBulkEntries(this)" style="float:right;">Post all</button>
+  </div>
+  <div id="bulk-result" style="margin-top:14px;"></div>
 </div>
 
         </div>

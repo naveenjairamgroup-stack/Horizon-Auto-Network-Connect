@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { formatMoney_, statusBadge_, showToast_, readFileAsBase64_, esc_ } from '../utils.js';
+import { formatMoney_, statusBadge_, showToast_, readFileAsBase64_, esc_, withBusy_ } from '../utils.js';
+import { fillDealerSelect_ } from '../dealers.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 var frameInputCount = 1;
@@ -29,8 +30,9 @@ export function handleSubmitReturn(event) {
   var fileInput = document.getElementById('ret-attachment');
   if (!fileInput.files.length) { showToast_(new Error('Tax invoice copy is mandatory.')); return; }
   var file = fileInput.files[0];
+  if (!document.getElementById('ret-dealer-code').value) { showToast_(new Error('Choose the dealer.')); return; }
 
-  readFileAsBase64_(file).then(function (base64) {
+  withBusy_(document.getElementById('ret-submit-btn'), function () { return readFileAsBase64_(file).then(function (base64) {
     return api('uploadAttachment', session.token, base64, file.name, file.type);
   }).then(function (uploaded) {
     var type = document.getElementById('ret-type').value;
@@ -49,12 +51,20 @@ export function handleSubmitReturn(event) {
     return api('submitReturn', session.token, ret);
   }).then(function () {
     showToast_(null, 'Return submitted for approval.');
+    var keep = session.role === 'Dealer' ? document.getElementById('ret-dealer-code').value : '';
     document.getElementById('new-return-form').reset();
+    if (keep) document.getElementById('ret-dealer-code').value = keep;
     loadReturns();
-  }).catch(function (err) { showToast_(err); });
+  }); }).catch(function (err) { showToast_(err); });
 }
 
+var returnDropdownReady = false;
+
 export function loadReturns() {
+  if (!returnDropdownReady) {
+    returnDropdownReady = true;
+    fillDealerSelect_(document.getElementById('ret-dealer-code'), { blank: '— choose dealer —' });
+  }
   api('listReturns', session.token).then(function (rows) {
     var tbody = document.getElementById('return-table-body');
     tbody.innerHTML = '';

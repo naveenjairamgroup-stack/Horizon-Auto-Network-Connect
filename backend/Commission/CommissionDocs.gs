@@ -124,7 +124,13 @@ function splitAddress_(address) {
  * drawn: they print this on their pre-printed stationery, so that space is
  * left blank rather than duplicated.
  */
-function buildInvoiceHtml_(report, dealer, forPrint) {
+function buildInvoiceHtml_(report, dealer, forPrint, padTop, padBottom) {
+  // The letterhead reserve applies to BOTH the print window and the PDF — a
+  // saved PDF is printed on the same letterhead paper, so it needs the same
+  // blank space. forPrint only decides whether the toolbar and the dashed
+  // on-screen guides are drawn.
+  padTop = padTop || COMMISSION_LETTERHEAD_TOP_MM + 'mm';
+  padBottom = padBottom || COMMISSION_LETTERHEAD_BOTTOM_MM + 'mm';
   var period = monthPeriod_(normalizeMonthKey_(report.Month));
   var addr = splitAddress_(dealer.Address);
   var taxable = Number(report.Taxable) || 0;
@@ -143,9 +149,9 @@ function buildInvoiceHtml_(report, dealer, forPrint) {
       '<div class="toolbar">' +
         '<h1>Tax invoice — commission for ' + esc_(period.label) + '</h1>' +
         '<div class="field"><label for="pt">Top space (mm)</label>' +
-          '<input id="pt" type="number" value="55" min="0" max="120"></div>' +
+          '<input id="pt" type="number" value="' + COMMISSION_LETTERHEAD_TOP_MM + '" min="0" max="120"></div>' +
         '<div class="field"><label for="pb">Bottom space (mm)</label>' +
-          '<input id="pb" type="number" value="35" min="0" max="120"></div>' +
+          '<input id="pb" type="number" value="' + COMMISSION_LETTERHEAD_BOTTOM_MM + '" min="0" max="120"></div>' +
         '<button onclick="window.print()">Print</button>' +
         '<p class="hint">The dashed areas are the space left for your pre-printed letterhead — they do not ' +
         'appear on paper. Adjust the two figures until the box sits where you want it, then print. ' +
@@ -160,7 +166,7 @@ function buildInvoiceHtml_(report, dealer, forPrint) {
 '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
 '<meta name="viewport" content="width=device-width, initial-scale=1">' +
 '<title>Tax Invoice — ' + esc_(dealer['Dealer Name']) + ' — ' + esc_(period.label) + '</title><style>' +
-':root{--pad-top:' + (forPrint ? '55mm' : '10mm') + ';--pad-bottom:' + (forPrint ? '35mm' : '10mm') + ';}' +
+':root{--pad-top:' + padTop + ';--pad-bottom:' + padBottom + ';}' +
 '*{box-sizing:border-box}' +
 'body{margin:0;background:' + (forPrint ? '#e8e8e8' : '#fff') + ';font-family:"Times New Roman",Times,serif;color:#000;font-size:13px}' +
 '.toolbar{background:#1b1b1b;color:#fff;padding:14px 20px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:13px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;position:sticky;top:0;z-index:10}' +
@@ -171,7 +177,7 @@ function buildInvoiceHtml_(report, dealer, forPrint) {
 '.toolbar button{font:inherit;font-weight:600;padding:8px 20px;border:0;border-radius:3px;background:#c8102e;color:#fff;cursor:pointer}' +
 '.toolbar .hint{flex:1 1 100%;color:#9a9a9a;font-size:12px;line-height:1.5;border-top:1px solid #333;padding-top:10px;margin:2px 0 0}' +
 '.sheet{width:210mm;min-height:297mm;margin:24px auto;background:#fff;padding:var(--pad-top) 16mm var(--pad-bottom) 16mm;box-shadow:0 2px 14px rgba(0,0,0,.22)}' +
-(forPrint ? '' : '.sheet{width:auto;min-height:0;margin:0;box-shadow:none;padding:var(--pad-top) 8mm var(--pad-bottom) 8mm}') +
+(forPrint ? '' : '.sheet{width:auto;min-height:0;margin:0;box-shadow:none;padding:var(--pad-top) 16mm var(--pad-bottom) 16mm}') +
 '.reserve{border:1px dashed #c9c9c9;color:#b0b0b0;font-family:system-ui,sans-serif;font-size:11px;text-align:center;padding:6px;margin-bottom:10mm}' +
 '.reserve-bottom{margin:10mm 0 0}' +
 'table{border-collapse:collapse;width:100%}' +

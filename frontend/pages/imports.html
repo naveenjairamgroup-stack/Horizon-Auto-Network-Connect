@@ -1,8 +1,41 @@
 <div class="card">
-  <h2>Drive Import</h2>
-  <p style="color:#888; font-size:12px;">Automatically runs daily at 12:00 and 16:00. Use this button to run it right now instead of waiting.</p>
-  <button onclick="handleImportNow()">Import Now</button>
-  <div id="import-now-result" style="margin-top:10px; font-size:13px;"></div>
+  <h2>Upload a DMS export</h2>
+  <p class="muted">
+    Upload the CSV exactly as exported from DMS. Columns can be in any order, but every required column must be there —
+    if one is missing the file is refused and the missing names are shown. The same file can't be imported twice.
+  </p>
+  <div class="filter-row">
+    <div>
+      <label>File type</label>
+      <select id="imp-type" onchange="onImportTypeChange()">
+        <option value="">— choose —</option>
+        <option value="VEHICLE_SALE">Vehicle sale (ASC)</option>
+        <option value="INTER_DEALER">Inter-dealer sale (AD)</option>
+        <option value="PARTS">Parts sale</option>
+        <option value="STOCK">Vehicle stock</option>
+      </select>
+    </div>
+    <div style="flex:2; min-width:260px;"><label>CSV file</label><input id="imp-file" type="file" accept=".csv,.txt,text/csv"></div>
+    <div><button type="button" id="imp-upload-btn" onclick="handleImportUpload(this)">Upload &amp; import</button></div>
+  </div>
+  <div id="imp-required" class="muted"></div>
+  <div id="imp-result" style="margin-top:12px;"></div>
+</div>
+
+<div class="card">
+  <h2>Data status</h2>
+  <table>
+    <thead><tr><th>Data</th><th>Data till</th><th>Last uploaded</th><th>By</th><th>File</th></tr></thead>
+    <tbody id="imp-status-body"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Upload history</h2>
+  <table>
+    <thead><tr><th>Uploaded</th><th>Type</th><th>File</th><th>Data till</th><th>Processed</th><th>Skipped</th><th>Updated</th><th>Reversed</th><th>Status</th></tr></thead>
+    <tbody id="imp-history-body"></tbody>
+  </table>
 </div>
 
 <div class="card">

@@ -219,6 +219,27 @@ against a real invoice before going live.
 
 ---
 
+## Part 5 — Upload import, Review, Bulk entry, mail threads (one-time)
+
+1. Run `setupDatabase`. Adds the `Import_File_Log` and `App_Settings` tabs, an
+   `Invoice Date` column on `Parts_Sale_Detail`, an `Email Thread ID` column on
+   `Commission_Report`, and the `Interest` ledger head. Existing rows are not touched.
+2. Run any function once and **Allow** the new Gmail permission. Commission
+   emails now go through GmailApp so the uploaded-invoice reply can land in the
+   same thread; Google describes that scope as "read, compose, send and
+   permanently delete all your email".
+3. Optional: run `disableDriveImportTriggers` to delete the twice-daily Drive
+   triggers. They are already inert — `scheduledImportRun_` returns at once
+   unless Admin switches Drive auto-import on in Commission → Settings.
+
+What changed for existing data: nothing is rewritten. Reversals are now
+idempotent (an already-reversed invoice is never reversed again), and Parts
+auto-cancellation only considers detail rows that carry an invoice date, so
+older rows are left alone. Duplicates that already exist show up in the new
+Review tab for Admin to clear by hand.
+
+---
+
 ## Why a proxy? (what actually went wrong, and why this fixes it)
 
 `google.script.run` — the usual way an Apps Script page talks to its own

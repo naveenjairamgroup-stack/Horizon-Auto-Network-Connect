@@ -14,6 +14,15 @@
       <div><span class="badge badge-green" id="ledger-credit-badge">&mdash;</span></div>
     </div>
   </div>
+  <div class="filter-row">
+    <div><label>From</label><input id="ledger-from" type="date"></div>
+    <div><label>To</label><input id="ledger-to" type="date"></div>
+    <div><button type="button" onclick="applyLedgerRange()">Show</button></div>
+    <div><button type="button" onclick="setLedgerRange('month')">This month</button></div>
+    <div><button type="button" onclick="setLedgerRange('fy')">This FY</button></div>
+    <div><button type="button" onclick="setLedgerRange('all')">All time</button></div>
+    <div id="ledger-range-label" class="muted" style="align-self:center;"></div>
+  </div>
   <table>
     <thead><tr><th>Date</th><th>Head</th><th>Invoice no.</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Running balance</th><th></th></tr></thead>
     <tbody id="ledger-table-body"></tbody>

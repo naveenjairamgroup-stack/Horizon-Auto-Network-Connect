@@ -107,6 +107,15 @@ var API_DISPATCH = {
 
   getInvoiceDetail: getInvoiceDetail,
   getInventoryDetail: getInventoryDetail,
+  // ---- Review, bulk entry, uploads, settings ----
+  listLedgerDuplicates: listLedgerDuplicates,
+  getSidebarCounts: getSidebarCounts,
+  postBulkLedgerEntries: postBulkLedgerEntries,
+  uploadImportFile: uploadImportFile,
+  getImportStatus: getImportStatus,
+  listImportUploads: listImportUploads,
+  listSettings: listSettings,
+  saveSetting: saveSetting,
 
   uploadAttachment: uploadAttachment
 };
@@ -154,7 +163,7 @@ function handleApiRequest_(e) {
   }
 
   try {
-    var result = target.apply(null, args);
+    var result = DEDUPED_WRITES[fn] ? runDeduped_(fn, args, target) : target.apply(null, args);
     return jsonOutput_(result);
   } catch (err) {
     // Business-logic functions already catch their own errors via safeRun()
@@ -167,4 +176,84 @@ function handleApiRequest_(e) {
 
 function jsonOutput_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ===================================================== REQUEST DE-DUPLICATION =
+/**
+ * Write calls that must not be applied twice when the same request arrives
+ * twice. Two things cause that, and both were producing duplicate payments:
+ *
+ *  1. A double click on Submit — two identical requests a few hundred
+ *     milliseconds apart.
+ *  2. The Cloudflare proxy's retry. If Apps Script has already WRITTEN the
+ *     row but the response comes back garbled, the proxy treats the call as
+ *     failed and sends it again — and a second row is written with nobody
+ *     having clicked anything.
+ *
+ * The fix keys each call on its function name + exact arguments (token
+ * included, so two different users never collide). The first arrival runs;
+ * an identical one within DEDUP_TTL_SECONDS gets the first one's result
+ * back instead of running again. Failures are not remembered, so a
+ * genuinely failed call can always be retried.
+ *
+ * Deliberately NOT in this list: anything where repeating identical
+ * arguments is legitimate — e.g. generateCommissionReport, where pressing
+ * Regenerate again after fixing data must actually regenerate.
+ */
+var DEDUPED_WRITES = {
+  submitPayment: true, approvePayment: true, rejectPayment: true,
+  submitReturn: true, approveReturn: true, rejectReturn: true,
+  addLedgerEntry: true, postBulkLedgerEntries: true, deleteLedgerEntries: true,
+  createDealer: true, createUser: true,
+  submitVehicleSaleReview: true, assignPartsSaleReview: true,
+  requestCommissionInvoice: true, uploadCommissionInvoice: true, verifyCommissionInvoice: true,
+  uploadImportFile: true, uploadAttachment: true
+};
+var DEDUP_TTL_SECONDS = 120;
+
+function runDeduped_(fn, args, target) {
+  var digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256, fn + '|' + JSON.stringify(args), Utilities.Charset.UTF_8);
+  var key = 'dedup:' + Utilities.base64EncodeWebSafe(digest);
+  var cache = CacheService.getScriptCache();
+
+  // Claim the key under a short lock so two near-simultaneous arrivals can't
+  // both see "not claimed". The lock is held only for the claim itself —
+  // never across the business call, which may take its own lock.
+  var existing;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    existing = cache.get(key);
+    if (!existing) cache.put(key, 'PENDING', DEDUP_TTL_SECONDS);
+  } finally {
+    lock.releaseLock();
+  }
+
+  if (existing) {
+    // Same request already in flight or done — wait for its result.
+    for (var i = 0; i < 60 && existing === 'PENDING'; i++) {
+      Utilities.sleep(500);
+      existing = cache.get(key);
+    }
+    if (existing && existing !== 'PENDING') {
+      try { return JSON.parse(existing); } catch (e) { /* fall through */ }
+    }
+    return { success: false, error: 'This request is already being processed. Please wait a moment and refresh.' };
+  }
+
+  var result;
+  try {
+    result = target.apply(null, args);
+  } catch (err) {
+    cache.remove(key);
+    throw err;
+  }
+  if (result && result.success) {
+    try { cache.put(key, JSON.stringify(result), DEDUP_TTL_SECONDS); }
+    catch (e) { cache.put(key, JSON.stringify({ success: true, data: null }), DEDUP_TTL_SECONDS); } // result too big for cache
+  } else {
+    cache.remove(key);
+  }
+  return result;
 }

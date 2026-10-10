@@ -1,12 +1,43 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
-import { formatMoney_, statusBadge_, showToast_, formatDateDisplay_, esc_ } from '../utils.js';
+import { formatMoney_, statusBadge_, showToast_, formatDateDisplay_, esc_, withBusy_ } from '../utils.js';
+import { fillDealerSelect_ } from '../dealers.js';
+import { refreshSidebarCounts } from '../sidebar.js';
 import { loadDashboardSummary } from './dashboard.js';
 
+var dropdownsReady = false;
+
+function currentFilters_() {
+  return {
+    fromDate: document.getElementById('payf-from').value,
+    toDate: document.getElementById('payf-to').value,
+    dealerCode: document.getElementById('payf-dealer').value,
+    status: document.getElementById('payf-status').value,
+    mode: document.getElementById('payf-mode').value
+  };
+}
+
+export function clearPaymentFilters() {
+  ['payf-from', 'payf-to', 'payf-status', 'payf-mode'].forEach(function (id) { document.getElementById(id).value = ''; });
+  if (session.role !== 'Dealer') document.getElementById('payf-dealer').value = '';
+  loadPayments();
+}
+
 export function loadPayments() {
-  api('listPayments', session.token).then(function (rows) {
+  if (!dropdownsReady) {
+    dropdownsReady = true;
+    fillDealerSelect_(document.getElementById('pay-dealer-code'), { blank: '— choose dealer —' });
+    fillDealerSelect_(document.getElementById('payf-dealer'), { blank: 'All dealers' });
+    if (session.role === 'Dealer') document.getElementById('payf-dealer-wrap').style.display = 'none';
+  }
+  var filters = currentFilters_();
+  api('listPayments', session.token, filters).then(function (rows) {
     var tbody = document.getElementById('payment-table-body');
     tbody.innerHTML = '';
+    var total = (rows || []).reduce(function (s, p) { return s + (Number(p.Amount) || 0); }, 0);
+    document.getElementById('payf-summary').textContent =
+      (rows || []).length + ' payment(s), total ' + formatMoney_(total);
+    if (!(rows || []).length) tbody.innerHTML = '<tr><td colspan="8" class="muted">No payments match these filters.</td></tr>';
     (rows || []).forEach(function (p) {
       var tr = document.createElement('tr');
       var actionHtml = '';
@@ -34,17 +65,39 @@ export function handleSubmitPayment(event) {
     'Reference No':  document.getElementById('pay-reference').value,
     'Remarks':       document.getElementById('pay-remarks').value
   };
-  api('submitPayment', session.token, payment).then(function () {
+  if (!payment['Dealer Code']) { showToast_(new Error('Choose the dealer.')); return; }
+  var button = document.getElementById('pay-submit-btn');
+  withBusy_(button, function () { return sendPayment_(payment); }).catch(function (err) { showToast_(err); });
+}
+
+/**
+ * The backend answers needsConfirm when the same dealer already has a
+ * payment of this amount on this date (and reference). Asking here turns an
+ * accidental repeat into a deliberate choice instead of a reject later.
+ */
+function sendPayment_(payment) {
+  return api('submitPayment', session.token, payment).then(function (res) {
+    if (res && res.needsConfirm) {
+      if (!window.confirm(res.message)) { showToast_(null, 'Not submitted.'); return; }
+      var again = {};
+      Object.keys(payment).forEach(function (k) { again[k] = payment[k]; });
+      again.force = true;
+      return sendPayment_(again);
+    }
     showToast_(null, 'Payment submitted for approval.');
+    var keepDealer = session.role === 'Dealer' ? payment['Dealer Code'] : '';
     document.getElementById('new-payment-form').reset();
+    if (keepDealer) document.getElementById('pay-dealer-code').value = keepDealer;
     loadPayments();
-  }).catch(function (err) { showToast_(err); });
+    refreshSidebarCounts();
+  });
 }
 
 export function handleApprovePayment(id) {
   api('approvePayment', session.token, id).then(function () {
     showToast_(null, 'Payment approved and posted to ledger.');
     loadPayments();
+    refreshSidebarCounts();
     loadDashboardSummary();
   }).catch(function (err) { showToast_(err); });
 }
@@ -54,6 +107,7 @@ export function handleRejectPayment(id) {
   api('rejectPayment', session.token, id, reason).then(function () {
     showToast_(null, 'Payment rejected.');
     loadPayments();
+    refreshSidebarCounts();
     loadDashboardSummary();
   }).catch(function (err) { showToast_(err); });
 }

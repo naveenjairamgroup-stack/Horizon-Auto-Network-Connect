@@ -82,6 +82,12 @@ def main():
         <div id="page-Imports" class="page">
 %(imports)s
         </div>
+        <div id="page-Review" class="page">
+%(review)s
+        </div>
+        <div id="page-BulkEntry" class="page">
+%(bulk_entry)s
+        </div>
       </div>
     </div>
   </div>
@@ -109,6 +115,8 @@ def main():
         'vehicle_sale_review': read('vehicle-sale-review.html'),
         'parts_review': read('parts-review.html'),
         'imports': read('imports.html'),
+        'review': read('review.html'),
+        'bulk_entry': read('bulk-entry.html'),
     }
 
     out_path = os.path.join(HERE, 'index.html')

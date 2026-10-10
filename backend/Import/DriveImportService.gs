@@ -68,17 +68,43 @@ function setupImportTriggers() {
   Logger.log('Import triggers set for 12:00 and 16:00 daily.');
 }
 
-/** Called by the time-driven triggers only. */
+/**
+ * Called by the time-driven triggers only.
+ *
+ * Switched off by default: imports now come in through the portal upload
+ * (UploadImportService.gs), which checks columns and refuses a file it has
+ * already imported. The Drive run re-read every file in the folder on every
+ * run, which is what kept re-applying old cancellations. The triggers can
+ * stay in place harmlessly — this returns at once unless Admin turns
+ * "Drive folder auto-import" back on in Settings. To remove the triggers
+ * outright, run disableDriveImportTriggers() once from the editor.
+ */
 function scheduledImportRun_() {
+  if (getSetting_('DRIVE_IMPORT_ENABLED') !== 'true') {
+    Logger.log('Drive auto-import is off (Settings). Skipped.');
+    return;
+  }
   runAllImports_('Scheduled');
 }
 
-/** Called by the "Import Now" button in the UI. */
+/** The old "Import Now" (Drive folders). Same switch as the schedule. */
 function runImportNow(token) {
   return safeRun('runImportNow', function () {
     var session = requireRole_(token, PERMISSIONS.Import.run);
+    if (getSetting_('DRIVE_IMPORT_ENABLED') !== 'true') {
+      throw new Error('Drive folder import is switched off. Upload the file in the Imports tab instead.');
+    }
     return runAllImports_(session.username);
   });
+}
+
+/** Run once from the editor to delete the twice-daily Drive import triggers. */
+function disableDriveImportTriggers() {
+  var n = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'scheduledImportRun_') { ScriptApp.deleteTrigger(t); n++; }
+  });
+  Logger.log(n + ' Drive import trigger(s) removed.');
 }
 
 /** Runs all three importers in turn and returns a combined summary. */
@@ -321,15 +347,50 @@ function getImportLog(token) {
  * effect is cancelled out. Used for both "Cancelled in file" and
  * "data changed, re-importing corrected version" cases.
  */
+/**
+ * Net position of one invoice on one ledger head: total Debit minus total
+ * Credit across every row for that dealer + invoice + head.
+ */
+function ledgerNetForInvoice_(dealerCode, invoiceNo, head) {
+  var net = 0;
+  getAllRows(SHEETS.LEDGER_TRANSACTIONS).forEach(function (r) {
+    if (String(r['Dealer Code']) !== String(dealerCode)) return;
+    if (String(r['Invoice No']) !== String(invoiceNo)) return;
+    if (String(r.Head) !== String(head)) return;
+    net += (Number(r.Debit) || 0) - (Number(r.Credit) || 0);
+  });
+  return net;
+}
+
+/**
+ * Posts the opposite entry for an invoice, so the original stays in the
+ * ledger and the pair nets it to zero.
+ *
+ * IDEMPOTENT. Before this guard, a cancelled invoice reversed again on every
+ * single import run that still contained it — the detail rows that mark it
+ * as "already imported" are never removed, so each run saw it afresh and
+ * posted yet another credit. With files never moved out of the import folder
+ * that compounded twice a day. The ledger itself is now the source of truth:
+ * if the invoice's remaining balance on this head is already zero, there is
+ * nothing left to reverse and nothing is written. It also never reverses more
+ * than what is still outstanding.
+ *
+ * Returns true if an entry was written, false if it was already reversed.
+ */
 function reverseLedgerEntry_(originalHead, dealerCode, invoiceNo, amount, wasDebit, reason) {
+  var net = ledgerNetForInvoice_(dealerCode, invoiceNo, originalHead);
+  var outstanding = wasDebit ? net : -net;
+  var amt = Math.min(Math.abs(Number(amount) || 0), outstanding);
+  if (!(amt > 0.005)) return false;
+
   var row = {
     'Entry ID': generateId('LED'),
     'Date': new Date(),
     'Invoice No': invoiceNo,
     'Head': originalHead,
     'Dealer Code': dealerCode,
-    'Debit': wasDebit ? 0 : amount,
-    'Credit': wasDebit ? amount : 0,
+    'Debit': wasDebit ? 0 : amt,
+    'Credit': wasDebit ? amt : 0,
     'Running Balance': 0,
     'Remarks': reason,
     'Created By': 'System (Import)',
@@ -337,7 +398,16 @@ function reverseLedgerEntry_(originalHead, dealerCode, invoiceNo, amount, wasDeb
   };
   appendRow(SHEETS.LEDGER_TRANSACTIONS, row, 'System (Import)');
   recomputeRunningBalance_(dealerCode);
+  return true;
 }
+
+/** Adds one importer's per-file counts into a running total. */
+function addCounts_(total, c) {
+  ['processed', 'skipped', 'updated', 'reversed'].forEach(function (k) { total[k] += (c[k] || 0); });
+  return total;
+}
+
+function newCounts_() { return { processed: 0, skipped: 0, updated: 0, reversed: 0 }; }
 
 /**
  * Powers the "view details" popup on a Ledger row. Vehicle Sale / Finance

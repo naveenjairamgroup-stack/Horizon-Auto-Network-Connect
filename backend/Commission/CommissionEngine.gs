@@ -448,7 +448,7 @@ function getCommissionReportDetail(token, reportId) {
  * Hands the report to the ASC: from here the figures are frozen, the ASC can
  * see them, and an email goes out with the full breakup attached.
  *
- * The email is sent BEFORE the status is written. If MailApp fails (quota,
+ * The email is sent BEFORE the status is written. If the send fails (quota,
  * bad address) the whole call throws and the report stays in Generated, so
  * the request can simply be retried — rather than the ASC being marked as
  * asked when nothing ever reached them.
@@ -477,27 +477,18 @@ function requestCommissionInvoice(token, reportId) {
     var pdfName = 'Commission-Breakup-' + slug_(dealer['Dealer Name']) + '-' +
       Utilities.formatDate(new Date(month + '-01T00:00:00Z'), 'Asia/Kolkata', 'MMM-yyyy');
 
-    var recipients = [dealer.Email].concat(COMMISSION_EMAIL_CC);
-    MailApp.sendEmail({
-      to: dealer.Email,
-      cc: COMMISSION_EMAIL_CC.join(','),
-      // Reply-To carries all three internal desks so a plain "Reply" from the
-      // ASC reaches them, instead of only the Google account that owns this
-      // script.
-      replyTo: COMMISSION_EMAIL_CC.join(','),
-      name: COMMISSION_EMAIL_SENDER_NAME,
-      subject: 'Commission for ' + period.label + ' — ' + formatCurrency(report['Invoice Amount']) +
-        ' — please raise your tax invoice',
-      htmlBody: buildRequestEmailHtml_(report, dealer),
-      attachments: [htmlToPdfBlob_(buildBreakupHtml_(report, lines, dealer), pdfName)]
-    });
+    var mail = commissionMailRecipients_(dealer);
+    var subject = commissionMailSubject_(report);
+    var threadId = sendMailWithThread_(mail, subject, buildRequestEmailHtml_(report, dealer),
+      [htmlToPdfBlob_(buildBreakupHtml_(report, lines, dealer), pdfName)]);
 
     updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
       'Status': COMMISSION_STATUS.INVOICE_REQUESTED,
       'Invoice Requested On': new Date(),
       'Invoice Requested By': session.username,
       'Email Sent On': new Date(),
-      'Email Recipients': recipients.join(', ')
+      'Email Recipients': mail.to.concat(mail.cc).join(', '),
+      'Email Thread ID': threadId
     }, session.username);
 
     appendRow(SHEETS.NOTIFICATION_LOG, {
@@ -509,7 +500,7 @@ function requestCommissionInvoice(token, reportId) {
       'Read Status': false
     }, session.username);
 
-    return { emailedTo: recipients };
+    return { emailedTo: mail.to.concat(mail.cc) };
   });
 }
 
@@ -580,6 +571,86 @@ function getCommissionPdf(token, reportId, kind) {
   });
 }
 
+// ================================================================== MAIL =
+/** To / CC / Reply-To / sender name, from Settings, falling back to Config.gs. */
+function commissionMailRecipients_(dealer) {
+  var to = [dealer.Email].concat(splitEmails_(getSetting_('MAIL_EXTRA_TO')));
+  var cc = splitEmails_(getSetting_('MAIL_CC'));
+  var replyTo = splitEmails_(getSetting_('MAIL_REPLY_TO'));
+  if (!replyTo.length) replyTo = cc;
+  return { to: to, cc: cc, replyTo: replyTo, name: getSetting_('MAIL_SENDER_NAME') || COMMISSION_EMAIL_SENDER_NAME };
+}
+
+function commissionMailSubject_(report) {
+  var period = monthPeriod_(normalizeMonthKey_(report.Month));
+  return 'Commission for ' + period.label + ' — ' + formatCurrency(report['Invoice Amount']) +
+    ' — please raise your tax invoice';
+}
+
+/**
+ * Sends through GmailApp (not MailApp) because only GmailApp can tell us
+ * which thread the message landed in — and that thread is where the ASC's
+ * uploaded invoice is later replied into, so the whole exchange reads as
+ * one conversation in everyone's inbox. Returns the thread id.
+ */
+function sendMailWithThread_(mail, subject, html, attachments) {
+  var opts = { htmlBody: html, name: mail.name, attachments: attachments || [] };
+  if (mail.cc.length) opts.cc = mail.cc.join(',');
+  if (mail.replyTo.length) opts.replyTo = mail.replyTo.join(',');
+  var draft = GmailApp.createDraft(mail.to.join(','), subject, 'Please view this email in an HTML-capable mail client.', opts);
+  var message = draft.send();
+  return message.getThread().getId();
+}
+
+/**
+ * Replies into the original request thread with the signed copy attached.
+ * Requests sent before thread ids were recorded have none to reply into;
+ * those get a fresh "Re:" email to the same people instead, which most mail
+ * clients still group with the original by subject.
+ */
+function replyWithSignedInvoice_(report, attachmentLink) {
+  var dealer = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', report['Dealer Code']);
+  if (!dealer || !isNonEmpty(dealer.Email)) return false;
+
+  var blob = null;
+  var m = String(attachmentLink || '').match(/\/d\/([a-zA-Z0-9_-]+)/) || String(attachmentLink || '').match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m) {
+    try { blob = DriveApp.getFileById(m[1]).getBlob(); } catch (e) { blob = null; }
+  }
+
+  var period = monthPeriod_(normalizeMonthKey_(report.Month));
+  var html =
+    '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',Roboto,sans-serif;color:#1a1a1a;line-height:1.55;max-width:640px;">' +
+    '<p style="font-size:14.5px;">' + esc_(dealer['Dealer Name']) + ' (' + esc_(report['Dealer Code']) +
+    ') has uploaded the signed tax invoice for ' + esc_(period.label) + '.</p>' +
+    '<table style="border-collapse:collapse;font-size:14px;margin:6px 0 14px;">' +
+    '<tr><td style="padding:4px 18px 4px 0;color:#6b6b6b;">Invoice no.</td><td style="padding:4px 0;"><strong>' +
+    esc_(report['ASC Invoice No']) + '</strong></td></tr>' +
+    '<tr><td style="padding:4px 18px 4px 0;color:#6b6b6b;">Invoice date</td><td style="padding:4px 0;">' +
+    fmtDate_(report['ASC Invoice Date']) + '</td></tr>' +
+    '<tr><td style="padding:4px 18px 4px 0;color:#6b6b6b;">Amount</td><td style="padding:4px 0;"><strong>&#8377;' +
+    inr_(report['ASC Invoice Amount'] || report['Invoice Amount']) + '</strong></td></tr></table>' +
+    (blob ? '<p style="font-size:13.5px;color:#6b6b6b;">The signed copy is attached.</p>'
+          : '<p style="font-size:13.5px;"><a href="' + esc_(attachmentLink) + '">Open the signed copy</a></p>') +
+    '<p style="font-size:13.5px;color:#6b6b6b;">Next: Accounts to verify it against Tally and post it in the Commission tab.</p></div>';
+
+  var mail = commissionMailRecipients_(dealer);
+  var opts = { htmlBody: html, name: mail.name, attachments: blob ? [blob] : [] };
+
+  var threadId = report['Email Thread ID'];
+  var thread = null;
+  if (threadId) { try { thread = GmailApp.getThreadById(threadId); } catch (e) { thread = null; } }
+
+  if (thread) {
+    thread.replyAll('Signed invoice uploaded.', opts);
+  } else {
+    if (mail.cc.length) opts.cc = mail.cc.join(',');
+    if (mail.replyTo.length) opts.replyTo = mail.replyTo.join(',');
+    GmailApp.sendEmail(mail.to.join(','), 'Re: ' + commissionMailSubject_(report), 'Signed invoice uploaded.', opts);
+  }
+  return true;
+}
+
 /** Shared load + permission check for every document endpoint. A Dealer only ever reaches its own, and not while still under review. */
 function commissionDocContext_(token, reportId) {
   var session = requireRole_(token, PERMISSIONS.Commission.view);
@@ -642,7 +713,16 @@ function uploadCommissionInvoice(token, reportId, invoiceNo, invoiceDate, amount
         'Uploaded On': new Date(),
         'Uploaded By': session.username
       }, session.username);
-      return true;
+
+      // The upload itself is what matters; a mail hiccup must not undo it.
+      var mailed = false, mailError = '';
+      try {
+        mailed = replyWithSignedInvoice_(findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId), attachmentLink);
+      } catch (mailErr) {
+        mailError = mailErr.message;
+        logError_('uploadCommissionInvoice: reply mail', mailErr);
+      }
+      return { mailed: mailed, mailError: mailError };
     } finally {
       lock.releaseLock();
     }

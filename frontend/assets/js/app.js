@@ -21,7 +21,7 @@ import {
   openDetailModal, closeDetailModal, openInventoryDetailModal,
   handleFindLedgerCleanup, handleDeleteLedgerCleanup
 } from './pages/ledger.js';
-import { handleSubmitPayment, handleApprovePayment, handleRejectPayment } from './pages/payments.js';
+import { handleSubmitPayment, handleApprovePayment, handleRejectPayment, loadPayments, clearPaymentFilters } from './pages/payments.js';
 import {
   handleSubmitReturn, handleApproveReturn, handleRejectReturn,
   onReturnTypeChange, addFrameNumberInput, removeFrameNumberInput
@@ -36,14 +36,20 @@ import {
   handleSaveCommissionRate, showCommissionRateHistory, unlockCommissionPin,
   handleSaveCommissionConfig, handleSetCommissionPin,
   openCommissionInvoice, closeCommissionInvoice, handleSaveCommissionInvoice,
-  printCommissionInvoice, downloadCommissionPdf
+  printCommissionInvoice, downloadCommissionPdf, saveAppSetting
 } from './pages/commission.js';
 import {
   openVehicleSaleReviewForm, closeVehicleSaleReviewForm, handleSubmitVehicleSaleReview,
   onRegistrationTypeChange, onInsuranceTypeChange, onEwTypeChange
 } from './pages/vehicleSaleReview.js';
 import { handleAssignPartsSale } from './pages/partsReview.js';
-import { handleImportNow } from './pages/imports.js';
+import { handleImportNow, handleImportUpload, onImportTypeChange } from './pages/imports.js';
+import { loadReview, deleteReviewSelection } from './pages/review.js';
+import {
+  onBulkHeadChange, addBulkRow, removeBulkRow, addAllBulkDealers, clearBulkRows,
+  updateBulkTotal, postBulkEntries
+} from './pages/bulkEntry.js';
+import { setLedgerRange, applyLedgerRange } from './pages/ledger.js';
 
 // ---- Public surface for inline onclick="..." / onchange="..." handlers ---
 // in the HTML (kept exactly as the original markup expects, to minimise
@@ -95,6 +101,24 @@ window.openCommissionInvoice = openCommissionInvoice;
 window.closeCommissionInvoice = closeCommissionInvoice;
 window.printCommissionInvoice = printCommissionInvoice;
 window.downloadCommissionPdf = downloadCommissionPdf;
+window.saveAppSetting = saveAppSetting;
+
+// ---- Payments filters, ledger range, imports, review, bulk entry ----
+window.loadPayments = loadPayments;
+window.clearPaymentFilters = clearPaymentFilters;
+window.setLedgerRange = setLedgerRange;
+window.applyLedgerRange = applyLedgerRange;
+window.handleImportUpload = handleImportUpload;
+window.onImportTypeChange = onImportTypeChange;
+window.loadReview = loadReview;
+window.deleteReviewSelection = deleteReviewSelection;
+window.onBulkHeadChange = onBulkHeadChange;
+window.addBulkRow = addBulkRow;
+window.removeBulkRow = removeBulkRow;
+window.addAllBulkDealers = addAllBulkDealers;
+window.clearBulkRows = clearBulkRows;
+window.updateBulkTotal = updateBulkTotal;
+window.postBulkEntries = postBulkEntries;
 
 document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('login-form').addEventListener('submit', handleLogin);
