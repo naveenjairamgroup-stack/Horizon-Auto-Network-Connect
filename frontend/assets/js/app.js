@@ -36,7 +36,7 @@ import {
   handleSaveCommissionRate, showCommissionRateHistory, unlockCommissionPin,
   handleSaveCommissionConfig, handleSetCommissionPin,
   openCommissionInvoice, closeCommissionInvoice, handleSaveCommissionInvoice,
-  printCommissionInvoice, downloadCommissionPdf, saveAppSetting
+  printCommissionInvoice, downloadCommissionPdf, saveAppSetting, reopenCommission
 } from './pages/commission.js';
 import {
   openVehicleSaleReviewForm, closeVehicleSaleReviewForm, handleSubmitVehicleSaleReview,
@@ -102,6 +102,7 @@ window.closeCommissionInvoice = closeCommissionInvoice;
 window.printCommissionInvoice = printCommissionInvoice;
 window.downloadCommissionPdf = downloadCommissionPdf;
 window.saveAppSetting = saveAppSetting;
+window.reopenCommission = reopenCommission;
 
 // ---- Payments filters, ledger range, imports, review, bulk entry ----
 window.loadPayments = loadPayments;

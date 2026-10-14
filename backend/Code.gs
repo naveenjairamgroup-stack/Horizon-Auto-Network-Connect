@@ -90,6 +90,7 @@ var API_DISPATCH = {
   getCommissionInvoiceHtml: getCommissionInvoiceHtml,
   getCommissionPdf: getCommissionPdf,
   verifyCommissionInvoice: verifyCommissionInvoice,
+  reopenCommissionReport: reopenCommissionReport,
 
   getDashboardSummary: getDashboardSummary,
   listDealerOutstandingSummary: listDealerOutstandingSummary,
@@ -207,6 +208,7 @@ var DEDUPED_WRITES = {
   createDealer: true, createUser: true,
   submitVehicleSaleReview: true, assignPartsSaleReview: true,
   requestCommissionInvoice: true, uploadCommissionInvoice: true, verifyCommissionInvoice: true,
+  reopenCommissionReport: true,
   uploadImportFile: true, uploadAttachment: true
 };
 var DEDUP_TTL_SECONDS = 120;

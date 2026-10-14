@@ -94,7 +94,13 @@ function collectCommissionLines_(dealerCode, month, rateMap) {
     if (frames.length > 1) multiFrameInvoices.push(invoiceNo);
 
     var invoiceDate = parseInvoiceDate_(q['Invoice Date']);
-    var isPermanent = String(q['Registration Type']).trim() === COMMISSION_REGISTRATION_TYPE;
+    // Registration commission needs BOTH: Permanent Registration selected AND
+    // a registration amount actually charged. A Permanent tick with amount 0
+    // means no registration was done through us (or the tick was a mistake) —
+    // either way there is nothing to pay commission on. Before this, the tick
+    // alone earned the flat amount.
+    var isPermanent = String(q['Registration Type']).trim() === COMMISSION_REGISTRATION_TYPE &&
+      parseAmount_(q['Registration Amount']) > 0;
     var insuranceAmount = parseAmount_(q['Insurance Amount']);
 
     frames.forEach(function (f, idx) {
@@ -502,6 +508,111 @@ function requestCommissionInvoice(token, reportId) {
 
     return { emailedTo: mail.to.concat(mail.cc) };
   });
+}
+
+/**
+ * Admin-only escape hatch for a report that was requested from the ASC and
+ * then turned out to be wrong.
+ *
+ * Normally a report is frozen from "Invoice Requested" onwards, because the
+ * ASC is raising a tax invoice against those exact figures. When the figures
+ * themselves are wrong, the only correct fix is to withdraw the request:
+ * this moves the report back to Generated (hidden from the ASC again),
+ * clears everything the ASC had entered or uploaded, and tells them in the
+ * original email thread that the earlier request is void and a revised one
+ * will follow. Then Regenerate and Request invoice work as usual — and the
+ * ASC gets a fresh email with the corrected amount.
+ *
+ * Not allowed once Posted: by then the amount is in the ledger and in
+ * Tally, and the correction belongs there (debit note + ASC credit note),
+ * not in a silently rewritten report.
+ */
+function reopenCommissionReport(token, reportId, reason) {
+  return safeRun('reopenCommissionReport', function () {
+    var session = requireRole_(token, [ROLES.ADMIN]);
+    var why = String(reason || '').trim();
+    if (why.length < 5) throw new Error('Give a short reason for reopening (at least a few words) — it goes in the record and to the dealer.');
+
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    var report, previousStatus;
+    try {
+      report = findRow(SHEETS.COMMISSION_REPORT, 'Report ID', reportId);
+      if (!report) throw new Error('Report not found: ' + reportId);
+      previousStatus = String(report.Status);
+      if (previousStatus === COMMISSION_STATUS.GENERATED) {
+        throw new Error('This report is already open (Generated). Just use Regenerate.');
+      }
+      if (previousStatus === COMMISSION_STATUS.POSTED) {
+        throw new Error('This report is already posted to the ledger and cannot be reopened. ' +
+          'Correct it in the Ledger with a debit/credit note, and get a matching credit note from the ASC.');
+      }
+
+      var stamp = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MM-yyyy HH:mm');
+      var note = 'Reopened from "' + previousStatus + '" by ' + session.username + ' on ' + stamp + ': ' + why;
+      updateRowWhere(SHEETS.COMMISSION_REPORT, 'Report ID', reportId, {
+        'Status': COMMISSION_STATUS.GENERATED,
+        'Invoice Requested On': '', 'Invoice Requested By': '',
+        'ASC Invoice No': '', 'ASC Invoice Date': '', 'ASC Invoice Amount': '',
+        'Attachment Link': '', 'Uploaded On': '', 'Uploaded By': '',
+        'Remarks': (report.Remarks ? report.Remarks + ' | ' : '') + note
+      }, session.username);
+    } finally {
+      lock.releaseLock();
+    }
+
+    appendRow(SHEETS.NOTIFICATION_LOG, {
+      'Dealer Code': report['Dealer Code'],
+      'Type': 'Commission Request Withdrawn',
+      'Message': 'Commission request for ' + normalizeMonthKey_(report.Month) + ' withdrawn: ' + why +
+        '. A revised request will follow — please do not use the earlier amount.',
+      'Timestamp': new Date(),
+      'Read Status': false
+    }, session.username);
+
+    // Tell the ASC in the same thread. Best effort: the reopen has already
+    // happened and must not be undone by a mail failure.
+    var mailed = false, mailError = '';
+    try { mailed = mailCommissionWithdrawn_(report, why); }
+    catch (e) { mailError = e.message; logError_('reopenCommissionReport: mail', e); }
+
+    return { previousStatus: previousStatus, mailed: mailed, mailError: mailError };
+  });
+}
+
+function mailCommissionWithdrawn_(report, reason) {
+  var dealer = findRow(SHEETS.DEALER_MASTER, 'Dealer Code', report['Dealer Code']);
+  if (!dealer || !isNonEmpty(dealer.Email)) return false;
+  var period = monthPeriod_(normalizeMonthKey_(report.Month));
+  var html =
+    '<div style="font-family:system-ui,-apple-system,\'Segoe UI\',Roboto,sans-serif;color:#1a1a1a;line-height:1.55;max-width:640px;">' +
+    '<p style="font-size:14.5px;">Dear ' + esc_(dealer['Dealer Name']) + ' (' + esc_(report['Dealer Code']) + '),</p>' +
+    '<div style="background:#fff8e6;border:1px solid #f0dfae;border-left:3px solid #c8102e;padding:12px 15px;margin:4px 0 14px;font-size:15px;">' +
+    '<strong>Please ignore our previous email</strong> requesting your ' + esc_(period.label) +
+    ' commission invoice of &#8377;' + inr_(report['Invoice Amount']) + '.</div>' +
+    '<p style="font-size:14.5px;margin:0 0 10px;">That request has been withdrawn because the amount needs to be corrected.</p>' +
+    '<p style="font-size:14px;color:#444;margin:0 0 14px;"><strong>Reason:</strong> ' + esc_(reason) + '</p>' +
+    '<ul style="font-size:14px;padding-left:20px;margin:0 0 14px;">' +
+    '<li style="margin-bottom:6px;">Please do not raise or upload a tax invoice for &#8377;' + inr_(report['Invoice Amount']) + '.</li>' +
+    '<li style="margin-bottom:6px;">If you have already prepared or uploaded one, please set it aside — it will not be processed.</li>' +
+    '<li>A revised request with the corrected amount will follow shortly.</li></ul>' +
+    '<p style="font-size:13.5px;color:#6b6b6b;margin:0;">We regret the inconvenience.<br>' +
+    esc_(COMPANY.name) + ' · Network Connect</p></div>';
+
+  var mail = commissionMailRecipients_(dealer);
+  var opts = { htmlBody: html, name: mail.name };
+  var thread = null;
+  if (report['Email Thread ID']) { try { thread = GmailApp.getThreadById(report['Email Thread ID']); } catch (e) { thread = null; } }
+  if (thread) {
+    thread.replyAll('Please ignore our previous email. The commission request has been withdrawn; a revised one will follow.', opts);
+  } else {
+    if (mail.cc.length) opts.cc = mail.cc.join(',');
+    if (mail.replyTo.length) opts.replyTo = mail.replyTo.join(',');
+    GmailApp.sendEmail(mail.to.join(','),
+      'Please ignore previous email — ' + period.label + ' commission request withdrawn',
+      'Please ignore our previous email. The commission request has been withdrawn; a revised one will follow.', opts);
+  }
+  return true;
 }
 
 /**

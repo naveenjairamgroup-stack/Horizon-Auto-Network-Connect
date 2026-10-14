@@ -135,6 +135,9 @@ function reportActions_(r) {
   if (canVerify_() && status === 'Invoice Uploaded') {
     html += ' <button onclick="openCommissionVerify(' + id + ')">Verify &amp; post</button>';
   }
+  if (isAdmin_() && (status === 'Invoice Requested' || status === 'Invoice Uploaded')) {
+    html += ' <button class="link-btn" onclick="reopenCommission(' + id + ')">Reopen</button>';
+  }
   if (r['Attachment Link']) {
     html += ' <a class="link-btn" href="' + esc_(r['Attachment Link']) + '" target="_blank" rel="noopener">Signed copy</a>';
   }
@@ -210,6 +213,29 @@ export function regenerateCommission(dealerCode, month) {
   if (!window.confirm('Regenerate ' + dealerCode + ' for ' + month + '? Yeh purani report hata ke naye data se dobara banayegi.')) return;
   api('generateCommissionReport', session.token, dealerCode, month).then(function (res) {
     showToast_(null, 'Regenerated. Invoice amount: ' + formatMoney_(res.summary.invoiceAmount));
+    loadCommissionReports();
+  }).catch(function (err) { showToast_(err); });
+}
+
+/**
+ * Admin: withdraw a request whose figures turned out wrong. The backend
+ * clears what the ASC entered/uploaded, moves the report back to Generated
+ * and tells the ASC in the original thread that the earlier amount is void.
+ */
+export function reopenCommission(reportId) {
+  var r = findReport_(reportId);
+  if (!r) { showToast_(new Error('Report not found.')); return; }
+  var reason = window.prompt(
+    'Reopen ' + (r['Dealer Name'] || r['Dealer Code']) + ' ' + r.Month + '?\n\n' +
+    'Report wapas "Generated" me chali jayegi, ASC ka bhara invoice no./date/upload hat jayega, aur ASC ko ' +
+    'mail jayega: "Please ignore our previous email".\n\n' +
+    'Reason ENGLISH me likho — ye dealer ke mail me jaisa likha waisa hi jayega.\n' +
+    'Example: Registration commission was wrongly added on invoice JH11000226V02008.');
+  if (reason === null) return;
+  if (reason.trim().length < 5) { showToast_(new Error('Reason thoda detail me likho.')); return; }
+  api('reopenCommissionReport', session.token, reportId, reason.trim()).then(function (res) {
+    var mailNote = res.mailed ? ' ASC ko mail chala gaya.' : (res.mailError ? ' (Mail nahi gaya: ' + res.mailError + ')' : '');
+    showToast_(null, 'Reopened. Ab data theek karke Regenerate, phir Request invoice.' + mailNote);
     loadCommissionReports();
   }).catch(function (err) { showToast_(err); });
 }
