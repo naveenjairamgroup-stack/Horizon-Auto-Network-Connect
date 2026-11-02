@@ -17,7 +17,7 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
 import { dashboardPageForRole } from '../router.js';
-import { formatMoney_, showToast_, esc_ } from '../utils.js';
+import { showToast_, esc_ } from '../utils.js';
 
 var ACTIONS = {
   Payments:          { key: 'pendingPayments',           label: 'Payments waiting for approval' },
@@ -32,11 +32,19 @@ var STATUS = {
   Red:    { cls: 'st-crit', icon: '✕', text: 'Over limit' }
 };
 
-/** ₹12,34,567.89 Dr / Cr — the amount without a sign, the side in words. */
+/**
+ * ₹12,34,568 — whole rupees. The dashboard is for reading the picture at a
+ * glance; paise only add noise here. Exact figures stay in the Ledger.
+ */
+function rupees_(n) {
+  return '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+/** ₹12,34,568 Dr / Cr — the amount without a sign, the side in words. */
 function drCr_(n) {
-  var v = Number(n) || 0;
-  if (Math.abs(v) < 0.005) return formatMoney_(0);
-  return formatMoney_(Math.abs(v)) + ' <span class="drcr">' + (v > 0 ? 'Dr' : 'Cr') + '</span>';
+  var v = Math.round(Number(n) || 0);
+  if (v === 0) return rupees_(0);
+  return rupees_(Math.abs(v)) + ' <span class="drcr">' + (v > 0 ? 'Dr' : 'Cr') + '</span>';
 }
 
 function nowTime_() {
@@ -145,9 +153,9 @@ function renderDealerList_(root, rows) {
     max = Math.max(max, Math.abs(v));
   });
   split.innerHTML =
-    '<div><i class="sw sw-dr"></i>Dealers owe Horizon <strong>' + formatMoney_(drSum) + '</strong>' +
+    '<div><i class="sw sw-dr"></i>Dealers owe Horizon <strong>' + rupees_(drSum) + '</strong>' +
       ' <span class="muted">· ' + drN + ' dealer' + (drN === 1 ? '' : 's') + '</span></div>' +
-    '<div><i class="sw sw-cr"></i>Horizon owes dealers <strong>' + formatMoney_(crSum) + '</strong>' +
+    '<div><i class="sw sw-cr"></i>Horizon owes dealers <strong>' + rupees_(crSum) + '</strong>' +
       ' <span class="muted">· ' + crN + ' dealer' + (crN === 1 ? '' : 's') + '</span></div>';
 
   // Both sides present: bars grow left (Cr) and right (Dr) from a centre
@@ -168,7 +176,7 @@ function renderDealerList_(root, rows) {
     var limit = Number(r.creditLimit);
     var limitNote = r.creditLimit === undefined ? ''
       : (limit > 0
-        ? Math.max(0, Math.round(Number(r.usedPercent) || 0)) + '% of ' + formatMoney_(limit) + ' limit used'
+        ? Math.max(0, Math.round(Number(r.usedPercent) || 0)) + '% of ' + rupees_(limit) + ' limit used'
         : 'No credit limit set');
     return '<div class="drow" data-i="' + i + '">' +
       '<div class="drow-name"><strong>' + esc_(r.dealerName) + '</strong>' +
@@ -199,8 +207,8 @@ function bindTooltip_(list, rows) {
     tip.innerHTML = '<strong>' + esc_(r.dealerName) + '</strong>' +
       '<div><span>Balance</span><b>' + drCr_(r.outstanding) + '</b></div>' +
       (r.creditLimit !== undefined
-        ? '<div><span>Credit limit</span><b>' + (limit > 0 ? formatMoney_(limit) : 'Not set') + '</b></div>' +
-          (limit > 0 ? '<div><span>Available</span><b>' + formatMoney_(Math.max(0, Number(r.availableBalance) || 0)) + '</b></div>' : '')
+        ? '<div><span>Credit limit</span><b>' + (limit > 0 ? rupees_(limit) : 'Not set') + '</b></div>' +
+          (limit > 0 ? '<div><span>Available</span><b>' + rupees_(Math.max(0, Number(r.availableBalance) || 0)) + '</b></div>' : '')
         : '');
     tip.style.display = 'block';
     var x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
@@ -253,12 +261,12 @@ function loadDealerDashboard_(root) {
     var meter = root.querySelector('.js-meter');
     if (limit > 0) {
       var used = Math.max(0, Number(c.usedPercent) || 0);
-      root.querySelector('.js-limit').textContent = formatMoney_(limit);
+      root.querySelector('.js-limit').textContent = rupees_(limit);
       meter.style.width = Math.min(used, 100) + '%';
       meter.className = 'meter-fill js-meter ' + (STATUS[c.status] || STATUS.Green).cls;
       root.querySelector('.js-limit-sub').innerHTML = statusPill_(c.status) +
         ' <span class="muted">' + Math.round(used) + '% used · ' +
-        formatMoney_(Math.max(0, Number(c.availableBalance) || 0)) + ' available</span>';
+        rupees_(Math.max(0, Number(c.availableBalance) || 0)) + ' available</span>';
     } else {
       root.querySelector('.js-limit').textContent = 'Not set';
       meter.style.width = '0';
