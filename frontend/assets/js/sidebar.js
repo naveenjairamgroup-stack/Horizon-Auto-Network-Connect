@@ -60,6 +60,10 @@ export function buildSidebar(role) {
       a.classList.add('active');
       var target = name === 'Dashboard' ? dashboardPageForRole(role) : name;
       showPage(target);
+      // On a phone the menu is a drawer over the page — close it, and start
+      // the new screen at the top rather than wherever the last one was.
+      document.body.classList.remove('nav-open');
+      window.scrollTo(0, 0);
       if (name === 'Dashboard') loadDashboardSummary();
       if (name === 'DealerMaster') loadDealers();
       if (name === 'UserMaster') loadUsers();
@@ -84,6 +88,12 @@ export function buildSidebar(role) {
   var firstLink = container.querySelector('a[data-page="Dashboard"]');
   if (firstLink) firstLink.classList.add('active');
   refreshSidebarCounts();
+}
+
+/** Opens a tab exactly as clicking it in the sidebar would (used by dashboard tiles). */
+export function goToPage(name) {
+  var link = document.querySelector('#sidebar-links a[data-page="' + name + '"]');
+  if (link) link.click();
 }
 
 // Tabs that carry a "things waiting for you" number. Always shown, 0 included,

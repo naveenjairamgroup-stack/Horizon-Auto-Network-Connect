@@ -41,9 +41,9 @@ function getDashboardSummary(token) {
 }
 
 /**
- * Quick-glance per-dealer table shown below the KPI cards on the Admin,
- * Accounts, and Network Manager dashboards — Dealer Name / Outstanding /
- * Credit Status, so the overall picture is visible the moment the
+ * Quick-glance per-dealer list shown below the KPI cards on the Admin,
+ * Accounts, and Network Manager dashboards — name, type, balance, credit
+ * limit use and status, so the overall picture is visible the moment the
  * dashboard opens without drilling into each dealer's Ledger. Sorted by
  * outstanding (highest first) since the biggest exposures are the most
  * useful thing to see at a glance.
@@ -57,7 +57,11 @@ function listDealerOutstandingSummary(token) {
       return {
         dealerCode: d['Dealer Code'],
         dealerName: d['Dealer Name'],
+        type: d.Type || '',
         outstanding: cs.outstanding,
+        creditLimit: cs.creditLimit,
+        availableBalance: cs.availableBalance,
+        usedPercent: cs.usedPercent,
         status: cs.status
       };
     }).sort(function (a, b) { return b.outstanding - a.outstanding; });

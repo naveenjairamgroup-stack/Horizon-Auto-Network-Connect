@@ -23,80 +23,38 @@
 
   <div id="main-section" style="display:none;">
 <div class="navbar">
-  <div class="brand">
-    <span class="brand-main">Horizon Auto</span>
-    <span class="brand-sub">Network Connect</span>
+  <div class="nav-left">
+    <button type="button" class="nav-toggle" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+    <div class="brand">
+      <span class="brand-main">Horizon Auto</span>
+      <span class="brand-sub">Network Connect</span>
+    </div>
   </div>
-  <div>
+  <div class="nav-right">
     <span id="navbar-username" style="margin-right:16px;"></span>
     <button onclick="handleLogout()">Log out</button>
   </div>
 </div>
+<div class="nav-backdrop" onclick="closeSidebar()"></div>
 
     <div class="layout">
 <div class="sidebar" id="sidebar-links"></div>
 
       <div class="content">
         <div id="page-Dashboard_Admin" class="page">
-<div class="card">
-  <h2>Admin dashboard</h2>
-  <div class="kpi-grid">
-    <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
-    <div><div class="kpi kpi-total-outstanding">-</div><div class="kpi-label">Total outstanding</div></div>
-    <div><div class="kpi kpi-over-limit">-</div><div class="kpi-label">Dealers over limit</div></div>
-    <div><div class="kpi kpi-pending-payments">-</div><div class="kpi-label">Pending payments</div></div>
-    <div><div class="kpi kpi-pending-returns">-</div><div class="kpi-label">Pending returns</div></div>
-    <div><div class="kpi kpi-pending-vsr">-</div><div class="kpi-label">Pending vehicle sale reviews</div></div>
-    <div><div class="kpi kpi-pending-psr">-</div><div class="kpi-label">Pending parts assignments</div></div>
-  </div>
-  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
-  <table>
-    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
-    <tbody id="dashboard-dealer-summary-body"></tbody>
-  </table>
-</div>
+<div class="dash" data-title="Admin dashboard" data-actions="Payments,Returns,VehicleSaleReview,PartsReview"></div>
 
         </div>
         <div id="page-Dashboard_NetworkManager" class="page">
-<div class="card">
-  <h2>Network Manager dashboard</h2>
-  <div class="kpi-grid">
-    <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
-    <div><div class="kpi kpi-total-outstanding">-</div><div class="kpi-label">Total outstanding</div></div>
-    <div><div class="kpi kpi-over-limit">-</div><div class="kpi-label">Dealers over limit</div></div>
-    <div><div class="kpi kpi-pending-returns">-</div><div class="kpi-label">Pending returns to approve</div></div>
-    <div><div class="kpi kpi-pending-vsr">-</div><div class="kpi-label">Pending vehicle sale reviews</div></div>
-  </div>
-  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
-  <table>
-    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
-    <tbody id="dashboard-dealer-summary-body"></tbody>
-  </table>
-</div>
+<div class="dash" data-title="Network Manager dashboard" data-actions="Returns,VehicleSaleReview"></div>
 
         </div>
         <div id="page-Dashboard_Accounts" class="page">
-<div class="card">
-  <h2>Accounts dashboard</h2>
-  <div class="kpi-grid">
-    <div><div class="kpi kpi-total-dealers">-</div><div class="kpi-label">Total dealers</div></div>
-    <div><div class="kpi kpi-total-outstanding">-</div><div class="kpi-label">Total outstanding</div></div>
-    <div><div class="kpi kpi-over-limit">-</div><div class="kpi-label">Dealers over limit</div></div>
-    <div><div class="kpi kpi-pending-payments">-</div><div class="kpi-label">Pending payments to approve</div></div>
-  </div>
-  <h3 style="font-size:14px; color:#666; margin:20px 0 8px;">Dealer-wise outstanding</h3>
-  <table>
-    <thead><tr><th>Dealer</th><th>Outstanding</th><th>Credit status</th></tr></thead>
-    <tbody id="dashboard-dealer-summary-body"></tbody>
-  </table>
-</div>
+<div class="dash" data-title="Accounts dashboard" data-actions="Payments"></div>
 
         </div>
         <div id="page-Dashboard_Dealer" class="page">
-<div class="card">
-  <h2>Welcome</h2>
-  <p>Open the Ledger tab to see your outstanding balance, credit limit status, and full transaction history.</p>
-</div>
+<div class="dash dash-dealer" data-title="My dashboard"></div>
 
         </div>
         <div id="page-DealerMaster" class="page">

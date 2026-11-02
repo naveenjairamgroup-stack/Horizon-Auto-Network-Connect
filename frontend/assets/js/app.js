@@ -12,7 +12,8 @@
  *      this migration), those functions must be reachable globally.
  */
 import { handleLogin, handleLogout, initializeAuth } from './auth.js';
-import { buildSidebar } from './sidebar.js';
+import { buildSidebar, goToPage } from './sidebar.js';
+import { loadDashboardSummary } from './pages/dashboard.js';
 
 import { loadDealers, handleCreateDealer, handleEditVehicleSaleAlias, handleEditInventoryAlias } from './pages/dealerMaster.js';
 import { onUserRoleChange, handleCreateUser, handleResetPassword, handleToggleUser } from './pages/userMaster.js';
@@ -50,6 +51,7 @@ import {
   updateBulkTotal, postBulkEntries
 } from './pages/bulkEntry.js';
 import { setLedgerRange, applyLedgerRange } from './pages/ledger.js';
+import { toggleSidebar, closeSidebar, initMobileTables } from './mobile.js';
 
 // ---- Public surface for inline onclick="..." / onchange="..." handlers ---
 // in the HTML (kept exactly as the original markup expects, to minimise
@@ -121,6 +123,14 @@ window.clearBulkRows = clearBulkRows;
 window.updateBulkTotal = updateBulkTotal;
 window.postBulkEntries = postBulkEntries;
 
+// ---- Dashboard ----
+window.goToPage = goToPage;
+window.loadDashboardSummary = loadDashboardSummary;
+
+// ---- Mobile menu ----
+window.toggleSidebar = toggleSidebar;
+window.closeSidebar = closeSidebar;
+
 document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('login-form').addEventListener('submit', handleLogin);
   document.getElementById('new-dealer-form').addEventListener('submit', handleCreateDealer);
@@ -139,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('vsr-form').addEventListener('submit', handleSubmitVehicleSaleReview);
   document.getElementById('cleanup-find-btn').addEventListener('click', handleFindLedgerCleanup);
   document.getElementById('cleanup-delete-btn').addEventListener('click', handleDeleteLedgerCleanup);
+  initMobileTables();
   initializeAuth();
 });
 

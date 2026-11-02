@@ -116,3 +116,245 @@
 .ledger-foot .lf-label { text-align: right; color: #555; }
 .ledger-foot tr:first-child td { border-top: 2px solid #ddd; }
 .ledger-foot tr.lf-closing td { border-top: 1px solid #bbb; font-size: 14px; color: #222; }
+
+/* ---- Dashboard ----------------------------------------------------------
+   Colour roles: Dr / Cr are an orange/blue pair (validated colour-blind safe
+   on white); status colours are reserved for credit status and always carry
+   an icon + word. Text never takes a series colour. */
+.dash {
+  --dr: #eb6834; --cr: #2a78d6;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --hair: #e8e7e1; --track: #f0efec;
+  --good: #0ca30c; --good-ink: #006300; --warn: #fab219; --warn-ink: #8a5a00;
+  --crit: #d03b3b; --crit-ink: #b42323;
+  color: var(--ink);
+}
+.dash-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 2px 2px 14px; }
+.dash-head h2 { margin: 0; font-size: 20px; }
+.dash-asof { display: flex; gap: 12px; align-items: baseline; }
+.dcard { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 18px 20px; }
+.dash-label { font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); }
+
+.dash-top { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+.dash-top-dealer { grid-template-columns: 1.4fr 1fr; }
+.dash-hero { border-top: 3px solid #c8102e; }
+.dash-hero-value { font-size: clamp(30px, 4vw, 48px); font-weight: 700; line-height: 1.1; margin: 8px 0 4px; letter-spacing: -0.5px; }
+.dash-hero-value .drcr { font-size: 0.5em; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
+.dash-hero-sub { color: var(--ink-2); font-size: 14px; }
+.dash-split { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-2); }
+.dash-split strong { color: var(--ink); }
+.dash-stat-value { font-size: 34px; font-weight: 700; line-height: 1.15; margin: 8px 0 6px; }
+.dash-stat-sub { font-size: 13px; color: var(--ink-2); }
+
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.sw-dr { background: var(--dr); }
+.sw-cr { background: var(--cr); }
+.drcr { font-weight: 600; color: var(--ink-2); font-size: 0.85em; }
+
+.st { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 9px 2px 7px; border-radius: 999px; white-space: nowrap; }
+.st b { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; color: #fff; font-size: 10px; }
+.st-good { background: #e9f6e9; color: var(--good-ink); } .st-good b { background: var(--good); }
+.st-warn { background: #fff4d9; color: var(--warn-ink); } .st-warn b { background: var(--warn); color: #0b0b0b; }
+.st-crit { background: #fdeaea; color: var(--crit-ink); } .st-crit b { background: var(--crit); }
+
+/* Waiting-for-action tiles */
+.dash-section-title { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 2px 10px; }
+.dash-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.dash-action {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 14px; align-items: center;
+  text-align: left; background: #fff; border: 1px solid var(--hair); border-left: 3px solid var(--hair);
+  border-radius: 10px; padding: 14px 16px; cursor: pointer; font: inherit; color: var(--ink);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.dash-action:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.dash-action .da-num { grid-row: 1 / 3; font-size: 28px; font-weight: 700; min-width: 34px; text-align: center; color: var(--muted); }
+.dash-action .da-label { font-size: 14px; font-weight: 600; }
+.dash-action .da-cta { font-size: 12px; color: var(--good-ink); margin-top: 2px; }
+.dash-action.has-work { border-left-color: #c8102e; }
+.dash-action.has-work .da-num { color: #c8102e; }
+.dash-action.has-work .da-cta { color: #c8102e; font-weight: 600; }
+
+/* Dealer-wise balance list */
+.dash-list-card { padding-bottom: 8px; }
+.dash-list-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 6px; }
+.dash-list-head h3 { margin: 0; font-size: 16px; }
+.dash-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); }
+.drow {
+  display: grid; grid-template-columns: minmax(170px, 1.3fr) 2fr minmax(140px, auto) minmax(170px, auto);
+  gap: 18px; align-items: center; padding: 11px 6px; border-top: 1px solid var(--hair); border-radius: 6px;
+}
+.drow:first-child { border-top: none; }
+.drow:hover { background: #fafaf8; }
+.drow-name { display: flex; flex-direction: column; min-width: 0; }
+.drow-name strong { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow-name .muted { font-size: 12px; }
+.dbar-track { position: relative; height: 12px; background: var(--track); border-radius: 4px; }
+.dbar-track-div::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: #c3c2b7; }
+.dbar { position: absolute; top: 0; bottom: 0; border-radius: 0 4px 4px 0; }
+.dbar-dr { background: var(--dr); }
+.dbar-cr { background: var(--cr); }
+.dbar-div.dbar-cr { border-radius: 4px 0 0 4px; }
+.drow-amt { text-align: right; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.drow-status { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.drow-status .muted { font-size: 11.5px; }
+
+.dash-tip {
+  position: fixed; display: none; z-index: 1100; pointer-events: none; min-width: 200px;
+  background: #fff; border: 1px solid rgba(11,11,11,0.10); border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12); padding: 10px 12px; font-size: 12.5px; color: #0b0b0b;
+}
+.dash-tip strong { display: block; margin-bottom: 6px; font-size: 13px; }
+.dash-tip div { display: flex; justify-content: space-between; gap: 16px; padding: 2px 0; }
+.dash-tip div > span { color: #52514e; }
+.dash-tip div > b { font-weight: 600; white-space: nowrap; }
+
+/* Credit limit meter (dealer dashboard) */
+.meter { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; margin: 4px 0 10px; }
+.meter-fill { height: 100%; width: 0; border-radius: 5px; background: var(--good); transition: width 0.4s; }
+.meter-fill.st-good { background: var(--good); }
+.meter-fill.st-warn { background: var(--warn); }
+.meter-fill.st-crit { background: var(--crit); }
+
+@media (max-width: 1100px) {
+  .dash-top { grid-template-columns: 1fr 1fr; }
+  .dash-top .dash-hero { grid-column: 1 / -1; }
+}
+
+/* ---- Navbar pieces used by the mobile menu (inert on desktop) ---------- */
+.nav-left { display: flex; align-items: center; gap: 10px; }
+.nav-right { display: flex; align-items: center; }
+.navbar .nav-toggle { display: none; }
+.nav-backdrop { display: none; }
+
+/* =========================================================================
+   PHONES (768px and below)
+   Desktop is untouched: everything below lives inside this one query.
+   ========================================================================= */
+@media (max-width: 768px) {
+  /* ---- Top bar: menu button, brand, compact user + logout ---- */
+  .navbar { position: sticky; top: 0; z-index: 900; padding: 8px 12px; }
+  .navbar .nav-toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; color: #fff; font-size: 22px; padding: 0;
+    width: 36px; height: 36px; border-radius: 4px;
+  }
+  .navbar .nav-toggle:active { background: rgba(255,255,255,0.15); }
+  .navbar .brand .brand-main { font-size: 15px; }
+  .navbar .brand .brand-sub { font-size: 9px; }
+  #navbar-username {
+    margin-right: 8px !important; font-size: 12px; max-width: 38vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block;
+  }
+  .navbar .nav-right button { padding: 6px 10px; font-size: 13px; white-space: nowrap; }
+
+  /* ---- Sidebar becomes a drawer that slides in from the left ---- */
+  .layout { display: block; min-height: 0; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 270px; max-width: 82vw;
+    z-index: 1001; overflow-y: auto; padding-top: 12px;
+    transform: translateX(-100%); transition: transform 0.22s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.18);
+  }
+  body.nav-open .sidebar { transform: none; }
+  .sidebar a { padding: 13px 20px; font-size: 15px; }
+  .nav-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; }
+  body.nav-open .nav-backdrop { display: block; }
+  body.nav-open { overflow: hidden; }
+
+  /* ---- Page frame ---- */
+  .content { padding: 12px; }
+  .card { padding: 14px; border-radius: 6px; margin-bottom: 12px; overflow-x: auto; }
+  .card h2 { font-size: 16px; }
+  #login-section { margin: 40px 16px; padding: 24px; }
+
+  /* ---- Forms: one field per line, sized for fingers ---- */
+  .form-row { gap: 10px; }
+  .form-row > div { flex: 1 1 100% !important; min-width: 0 !important; }
+  input, select { font-size: 16px; padding: 10px; } /* 16px stops iOS zooming in on focus */
+  input[type="checkbox"], input[type="radio"] { width: auto; padding: 0; }
+  button { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+  button.link-btn, .link-btn { min-height: 0; padding: 4px 0; font-size: 14px; }
+  .radio-group { flex-direction: column; gap: 10px; }
+
+  /* Filter strips: two per line (From / To, button pairs); wide ones full line. */
+  .filter-row { gap: 8px; }
+  .filter-row > div { flex: 1 1 calc(50% - 4px); min-width: 0 !important; }
+  .filter-row > div[style*="flex:2"], .filter-row > div:has(select),
+  .filter-row > div:has(input[type="file"]), #ledger-range-label { flex-basis: 100% !important; }
+  .filter-row button { width: 100%; }
+  #bulk-post-btn { float: none !important; width: 100%; margin-top: 8px; }
+
+  /* ---- Dashboard numbers: two per line ---- */
+  .kpi-grid { gap: 12px; }
+  .kpi-grid > div { flex: 1 1 calc(50% - 6px); min-width: 0; max-width: none; }
+  .kpi { font-size: 18px; }
+
+  /* ---- Commission tab bar scrolls sideways instead of wrapping ---- */
+  .tab-bar { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cm-tab { white-space: nowrap; flex: 0 0 auto; }
+
+  /* ---- Popups fill the screen ---- */
+  .modal-overlay { align-items: stretch; }
+  .modal-box, .modal-box.modal-wide {
+    width: 100%; max-width: 100%; max-height: 100%; height: 100%;
+    border-radius: 0; padding: 0 16px 20px;
+  }
+  .modal-header { position: sticky; top: 0; background: #fff; z-index: 1; padding: 14px 0 10px; margin-bottom: 6px; }
+  .modal-header button { min-height: 0; padding: 4px 8px; }
+
+  /* ---- Wide tables as cards (rows labelled by mobile.js) ---- */
+  table.rtable, table.rtable tbody, table.rtable tr { display: block; width: 100%; }
+  table.rtable thead { display: none; }
+  table.rtable { background: transparent; }
+  table.rtable tbody tr {
+    background: #fff; border: 1px solid #e3e3e3; border-radius: 8px;
+    padding: 6px 12px; margin-bottom: 10px;
+  }
+  table.rtable tbody td {
+    display: block; position: relative; border: none; padding: 6px 0 6px 42%;
+    text-align: right; min-height: 28px; word-break: break-word;
+  }
+  table.rtable tbody td::before {
+    content: attr(data-label); position: absolute; left: 0; top: 6px; width: 40%;
+    text-align: left; color: #888; font-size: 12px; font-weight: normal;
+  }
+  table.rtable tbody td:empty { display: none; }
+  table.rtable tbody td[data-label=""], table.rtable tbody td.rt-span { padding-left: 0; text-align: left; }
+  table.rtable tbody td[data-label=""]::before, table.rtable tbody td.rt-span::before { display: none; }
+  table.rtable tbody td + td { border-top: 1px solid #f3f3f3; }
+  table.rtable tbody td input, table.rtable tbody td select { width: 100%; }
+  table.rtable tbody td .link-btn, table.rtable tbody td button { margin: 3px 0 3px 10px; }
+  /* Footer rows (ledger totals, bulk total) read as one line each. */
+  table.rtable tfoot { display: block; }
+  table.rtable tfoot tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 8px 4px; border-top: 1px solid #ddd; }
+  table.rtable tfoot td { display: block; border: none; padding: 0; background: none; }
+  table.rtable tfoot td:empty { display: none; }
+  table.rtable tfoot .lf-label { flex: 1 1 100%; text-align: left; }
+
+  /* ---- Ledger: opening/closing footer stays readable ---- */
+  .ledger-foot tr.lf-closing td { font-size: 15px; }
+  /* Column headings are hidden on a phone, so name the two totals. */
+  .ledger-foot .lf-dr::before { content: 'Dr '; color: #888; font-weight: normal; }
+  .ledger-foot .lf-cr::before { content: 'Cr '; color: #888; font-weight: normal; }
+
+  /* ---- Review groups ---- */
+  .review-group { padding: 10px; }
+
+  /* ---- Dashboard ---- */
+  .dash-head h2 { font-size: 18px; }
+  .dcard { padding: 14px 16px; }
+  .dash-top { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .dash-top-dealer { grid-template-columns: 1fr; }
+  .dash-stat-value { font-size: 26px; }
+  .dash-actions { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+  .dash-action { min-height: 0; padding: 12px 14px; }
+  .dash-legend { gap: 6px 14px; }
+  /* Each dealer: name + amount on one line, bar under it, status under that. */
+  .drow { grid-template-columns: 1fr auto; grid-template-areas: "name amt" "bar bar" "status status"; gap: 6px 10px; padding: 12px 2px; }
+  .drow-name { grid-area: name; } .drow-amt { grid-area: amt; }
+  .drow-bar { grid-area: bar; } .drow-status { grid-area: status; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .dash-tip { display: none !important; }
+
+  /* ---- Toast spans the bottom ---- */
+  .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+}

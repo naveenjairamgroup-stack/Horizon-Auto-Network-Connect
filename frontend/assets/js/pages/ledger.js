@@ -123,7 +123,7 @@ function renderLedgerFooter_(s) {
   };
   tfoot.innerHTML =
     '<tr><td colspan="4" class="lf-label">Opening Balance :</td>' + side(s.opening) + '<td></td></tr>' +
-    '<tr><td colspan="4" class="lf-label">Current Total :</td><td>' + formatMoney_(s.debit) + '</td><td>' +
+    '<tr><td colspan="4" class="lf-label">Current Total :</td><td class="lf-dr">' + formatMoney_(s.debit) + '</td><td class="lf-cr">' +
       formatMoney_(s.credit) + '</td><td></td><td></td></tr>' +
     '<tr class="lf-closing"><td colspan="4" class="lf-label">Closing Balance :</td>' + side(s.closing) + '<td></td></tr>';
 }

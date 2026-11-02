@@ -1,10 +1,14 @@
 <div class="navbar">
-  <div class="brand">
-    <span class="brand-main">Horizon Auto</span>
-    <span class="brand-sub">Network Connect</span>
+  <div class="nav-left">
+    <button type="button" class="nav-toggle" onclick="toggleSidebar()" aria-label="Menu">&#9776;</button>
+    <div class="brand">
+      <span class="brand-main">Horizon Auto</span>
+      <span class="brand-sub">Network Connect</span>
+    </div>
   </div>
-  <div>
+  <div class="nav-right">
     <span id="navbar-username" style="margin-right:16px;"></span>
     <button onclick="handleLogout()">Log out</button>
   </div>
 </div>
+<div class="nav-backdrop" onclick="closeSidebar()"></div>
