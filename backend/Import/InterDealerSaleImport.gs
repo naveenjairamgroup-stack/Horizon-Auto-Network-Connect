@@ -124,10 +124,39 @@ function buildCustomerName_(f) {
     .join(' ');
 }
 
-/** Deletes a set of already-fetched rows (each must carry the internal _row property from getAllRows/findRows). */
+/**
+ * Deletes a set of already-fetched rows (each must carry the internal _row
+ * property from getAllRows/findRows).
+ *
+ * Two things this guards against:
+ *  - Sheets refuses to delete the LAST remaining non-frozen row ("You can't
+ *    delete all the rows on the sheet that are not frozen"). When every data
+ *    row of a tab was being removed — a full stock snapshot, or regenerating
+ *    the only commission report — the final delete threw, the run failed with
+ *    one stale row left behind, and every later run hit the same row and
+ *    failed again. A spare blank row is added first whenever the delete would
+ *    otherwise empty the sheet.
+ *  - Speed: adjacent rows are removed as one block (deleteRows) instead of
+ *    one API call per row.
+ */
 function deleteRowsWhere_(tabName, rows) {
+  if (!rows || !rows.length) return;
   var sheet = getSpreadsheet().getSheetByName(tabName);
-  var rowNumbers = rows.map(function (r) { return r._row; }).sort(function (a, b) { return b - a; }); // delete bottom-up
-  rowNumbers.forEach(function (rn) { sheet.deleteRow(rn); });
+  var rowNumbers = rows.map(function (r) { return r._row; })
+    .filter(function (rn, i, all) { return rn >= 2 && all.indexOf(rn) === i; })
+    .sort(function (a, b) { return b - a; }); // bottom-up, so earlier row numbers stay valid
+  if (!rowNumbers.length) return;
+
+  var nonFrozen = sheet.getMaxRows() - sheet.getFrozenRows();
+  if (rowNumbers.length >= nonFrozen) sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+
+  var i = 0;
+  while (i < rowNumbers.length) {
+    var bottom = rowNumbers[i];
+    var count = 1;
+    while (i + count < rowNumbers.length && rowNumbers[i + count] === bottom - count) count++;
+    sheet.deleteRows(bottom - count + 1, count);
+    i += count;
+  }
   invalidateSheetCache_(tabName);
 }

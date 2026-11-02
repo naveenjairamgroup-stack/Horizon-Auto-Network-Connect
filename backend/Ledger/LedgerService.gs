@@ -46,7 +46,12 @@ function addLedgerEntry(token, entry) {
  * themselves rather than read from the stored Running Balance column, so a
  * range view is correct even if that column is momentarily behind.
  *
- * Without dates it behaves exactly as before: the whole ledger.
+ * Without dates it covers the whole ledger, led by the FY opening row.
+ *
+ * Returns { rows, summary } where summary is the Tally-style footer for the
+ * window: { opening, debit, credit, closing }. opening/closing are signed
+ * (positive = Dr, dealer owes; negative = Cr); debit/credit are the totals of
+ * the entries inside the window only — the opening row is not counted in them.
  */
 function getLedger(token, dealerCode, fromDate, toDate) {
   return safeRun('getLedger', function () {
@@ -71,6 +76,7 @@ function getLedger(token, dealerCode, fromDate, toDate) {
     });
 
     if (!fromDate && !toDate) {
+      var allSummary = ledgerSummary_(openingSigned, rows);
       if (Number(opening.Amount) > 0) {
         var isDr = opening['Balance Type'] !== 'Cr';
         rows = [{
@@ -87,7 +93,7 @@ function getLedger(token, dealerCode, fromDate, toDate) {
           'Timestamp': opening['Set On'] || ''
         }].concat(rows);
       }
-      return rows;
+      return { rows: rows, summary: allSummary };
     }
 
     var from = fromDate ? istDayStart_(fromDate) : null;
@@ -115,8 +121,24 @@ function getLedger(token, dealerCode, fromDate, toDate) {
       'Created By': '',
       'Timestamp': ''
     };
-    return [openRow].concat(inRange);
+    return { rows: [openRow].concat(inRange), summary: ledgerSummary_(before, inRange) };
   });
+}
+
+/** Opening, Dr total, Cr total and closing for a set of entries, rounded to paise. */
+function ledgerSummary_(openingSigned, entries) {
+  var dr = 0, cr = 0;
+  entries.forEach(function (r) {
+    dr += Number(r.Debit) || 0;
+    cr += Number(r.Credit) || 0;
+  });
+  var r2 = function (n) { return Math.round(n * 100) / 100; };
+  return {
+    opening: r2(openingSigned),
+    debit: r2(dr),
+    credit: r2(cr),
+    closing: r2(openingSigned + dr - cr)
+  };
 }
 
 /** Date order, with Timestamp breaking ties so same-day entries never shuffle between views. */
@@ -187,7 +209,7 @@ function recomputeRunningBalance_(dealerCode) {
 
 // ======================================================= BULK ENTRY ===
 /**
- * Posts one head (Interest or Commission) for many dealers at once, each
+ * Posts one head (Interest, Training Fee or Commission) for many dealers at once, each
  * with its own amount — the screen that replaces opening every dealer's
  * ledger in turn.
  *
@@ -276,8 +298,9 @@ function ensureVoucherHead_(head) {
   var exists = getAllRows(SHEETS.VOUCHER_HEAD_MASTER).some(function (r) { return String(r['Head Name']) === head; });
   if (exists) return;
   var spec = {
-    'Interest':   ['Journal',  EFFECT.INCREASE, false, true],
-    'Commission': ['Purchase', EFFECT.DECREASE, true,  true]
+    'Interest':     ['Journal',  EFFECT.INCREASE, false, true],
+    'Training Fee': ['Journal',  EFFECT.INCREASE, false, true],
+    'Commission':   ['Purchase', EFFECT.DECREASE, true,  true]
   }[head];
   if (!spec) throw new Error('Unknown head: ' + head);
   appendRow(SHEETS.VOUCHER_HEAD_MASTER, {

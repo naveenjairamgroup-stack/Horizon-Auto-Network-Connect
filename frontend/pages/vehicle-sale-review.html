@@ -7,8 +7,13 @@
   </table>
 </div>
 
-<div class="card" id="vsr-form-card" style="display:none;">
-  <h2 id="vsr-form-title">Review invoice</h2>
+<div class="modal-overlay" id="vsr-form-overlay">
+  <div class="modal-box modal-wide">
+  <div class="modal-header">
+    <h3 id="vsr-form-title">Review invoice</h3>
+    <button type="button" onclick="closeVehicleSaleReviewForm()">&times;</button>
+  </div>
+  <div id="vsr-form-sub" class="muted" style="margin:-6px 0 14px;"></div>
   <form id="vsr-form">
     <input type="hidden" id="vsr-queue-id">
     <div class="form-row">
@@ -64,4 +69,5 @@
     <button type="submit">Submit &amp; post to ledger</button>
     <button type="button" onclick="closeVehicleSaleReviewForm()">Cancel</button>
   </form>
+  </div>
 </div>

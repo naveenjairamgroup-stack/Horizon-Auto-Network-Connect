@@ -45,6 +45,7 @@
   .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; }
   .modal-header h3 { margin:0; font-size: 16px; }
   .modal-header button { background:none; border:none; font-size:22px; cursor:pointer; color:#888; line-height:1; }
+  .modal-box.modal-wide { max-width: 880px; }
   .modal-box table { margin-top: 8px; }
   .modal-total-row td { font-weight:bold; border-top: 2px solid #ddd; }
   .link-btn { background:none; border:none; color:#c8102e; text-decoration:underline; cursor:pointer; padding:0; font-size:13px; }
@@ -109,3 +110,9 @@
 .import-error { background: #fff4f5; border: 1px solid #f3c1c8; color: #8a1023; padding: 10px 12px; border-radius: 4px; font-size: 13px; white-space: pre-wrap; }
 .import-ok { background: #f1f8f2; border: 1px solid #c4e2c8; color: #1f5f27; padding: 10px 12px; border-radius: 4px; font-size: 13px; }
 .muted { color: #888; font-size: 12px; }
+
+/* ---- Ledger footer (Tally-style opening / current total / closing) ---- */
+.ledger-foot td { font-weight: 600; background: #fafafa; }
+.ledger-foot .lf-label { text-align: right; color: #555; }
+.ledger-foot tr:first-child td { border-top: 2px solid #ddd; }
+.ledger-foot tr.lf-closing td { border-top: 1px solid #bbb; font-size: 14px; color: #222; }

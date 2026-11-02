@@ -5,9 +5,11 @@ import { formatMoney_, statusBadge_, showToast_, esc_ } from '../utils.js';
 import { loadDashboardSummary } from './dashboard.js';
 
 var vsrCurrentQueueId = null;
+var vsrRowsCache = [];
 
 export function loadVehicleSaleReviews() {
   api('listVehicleSaleReviews', session.token).then(function (rows) {
+    vsrRowsCache = rows || [];
     var tbody = document.getElementById('vsr-table-body');
     tbody.innerHTML = '';
     (rows || []).forEach(function (r) {
@@ -29,14 +31,28 @@ export function loadVehicleSaleReviews() {
   }).catch(function (err) { showToast_(err); });
 }
 
+function findReviewRow_(rows, queueId) {
+  for (var i = 0; i < rows.length; i++) { if (rows[i]['Queue ID'] === queueId) return rows[i]; }
+  return null;
+}
+
+/**
+ * Opens the review form as a popup over the list, so the row being worked on
+ * stays where it is instead of the form appearing at the bottom of a long
+ * page. Uses the list already on screen; only re-fetches if the row is not
+ * in it (e.g. the list was loaded before an import added it).
+ */
 export function openVehicleSaleReviewForm(queueId) {
-  api('listVehicleSaleReviews', session.token).then(function (rows) {
-    var row = null;
-    for (var i = 0; i < rows.length; i++) { if (rows[i]['Queue ID'] === queueId) { row = rows[i]; break; } }
+  var cached = findReviewRow_(vsrRowsCache, queueId);
+  var load = cached ? Promise.resolve(vsrRowsCache) : api('listVehicleSaleReviews', session.token);
+  load.then(function (rows) {
+    var row = findReviewRow_(rows || [], queueId);
     if (!row) { showToast_(new Error('Not found.')); return; }
     vsrCurrentQueueId = queueId;
 
     document.getElementById('vsr-form-title').textContent = (row.Status === 'Pending' ? 'Review' : 'Edit') + ' invoice ' + row['Invoice No'];
+    document.getElementById('vsr-form-sub').textContent =
+      [row['Dealer Name'] || row['Dealer Code'], row['Customer Name'], row['Model Info']].filter(Boolean).join('  ·  ');
     document.getElementById('vsr-frames').value = row['Frame Numbers'] || '';
     document.getElementById('vsr-raw-total').value = formatMoney_(row['Total Invoice Amount']);
     document.getElementById('vsr-purchase-type').value = row['Purchase Type'] || '';
@@ -57,12 +73,12 @@ export function openVehicleSaleReviewForm(queueId) {
     onRegistrationTypeChange();
     onInsuranceTypeChange();
     onEwTypeChange();
-    document.getElementById('vsr-form-card').style.display = 'block';
+    document.getElementById('vsr-form-overlay').style.display = 'flex';
   }).catch(function (err) { showToast_(err); });
 }
 
 export function closeVehicleSaleReviewForm() {
-  document.getElementById('vsr-form-card').style.display = 'none';
+  document.getElementById('vsr-form-overlay').style.display = 'none';
   document.getElementById('vsr-form').reset();
   vsrCurrentQueueId = null;
 }

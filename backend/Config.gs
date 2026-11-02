@@ -314,8 +314,9 @@ var IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 // ---- Ledger --------------------------------------------------------------
 // Heads allowed in Bulk ledger entry, and which side each one posts to.
 var BULK_ENTRY_HEADS = {
-  'Interest':   'Debit',   // charged to the dealer
-  'Commission': 'Credit'   // paid to the dealer
+  'Interest':     'Debit',   // charged to the dealer
+  'Training Fee': 'Debit',   // charged to the dealer
+  'Commission':   'Credit'   // paid to the dealer
 };
 
 // A payment matching an earlier one on dealer, amount, date and reference

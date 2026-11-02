@@ -69,7 +69,10 @@ export function loadLedger(dealerCode) {
   if (document.getElementById('entry-dealer-code')) document.getElementById('entry-dealer-code').value = dealerCode;
   if (document.getElementById('ob-dealer-code')) document.getElementById('ob-dealer-code').value = dealerCode;
 
-  api('getLedger', session.token, dealerCode, from, to).then(function (rows) {
+  api('getLedger', session.token, dealerCode, from, to).then(function (res) {
+    // Older backends returned a bare array with no summary; keep working with it.
+    var rows = Array.isArray(res) ? res : (res && res.rows) || [];
+    renderLedgerFooter_(Array.isArray(res) ? null : res && res.summary);
     var tbody = document.getElementById('ledger-table-body');
     tbody.innerHTML = '';
     var invoiceDetailHeads = ['Vehicle Sale', 'Parts Sale', 'Finance Company Advance'];
@@ -99,6 +102,30 @@ export function loadLedger(dealerCode) {
     badge.textContent = status.status + ' \u00b7 ' + status.usedPercent + '% of limit used';
     badge.className = 'badge badge-' + status.status.toLowerCase();
   }).catch(function (err) { showToast_(err); });
+}
+
+/**
+ * Tally-style footer under the ledger table for the selected period:
+ *   Opening Balance  — balance before the period, in the Debit column when the
+ *                      dealer owes (Dr) and the Credit column when we owe (Cr)
+ *   Current Total    — total Debit and total Credit of the period's entries
+ *   Closing Balance  — Opening + Debit − Credit, placed by the same Dr/Cr rule
+ */
+function renderLedgerFooter_(s) {
+  var tfoot = document.getElementById('ledger-table-foot');
+  if (!tfoot) return;
+  if (!s) { tfoot.innerHTML = ''; return; }
+  var side = function (n) {
+    var v = Number(n) || 0;
+    if (Math.abs(v) < 0.005) return '<td></td><td></td><td></td>';
+    var amt = formatMoney_(Math.abs(v));
+    return v > 0 ? '<td>' + amt + '</td><td></td><td>Dr</td>' : '<td></td><td>' + amt + '</td><td>Cr</td>';
+  };
+  tfoot.innerHTML =
+    '<tr><td colspan="4" class="lf-label">Opening Balance :</td>' + side(s.opening) + '<td></td></tr>' +
+    '<tr><td colspan="4" class="lf-label">Current Total :</td><td>' + formatMoney_(s.debit) + '</td><td>' +
+      formatMoney_(s.credit) + '</td><td></td><td></td></tr>' +
+    '<tr class="lf-closing"><td colspan="4" class="lf-label">Closing Balance :</td>' + side(s.closing) + '<td></td></tr>';
 }
 
 export function loadVoucherHeadOptions() {

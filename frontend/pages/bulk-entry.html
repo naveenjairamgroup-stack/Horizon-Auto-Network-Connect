@@ -1,7 +1,7 @@
 <div class="card">
   <h2>Bulk ledger entry</h2>
   <p class="muted">
-    Post Interest or Commission to many dealers at once, each with its own amount.
+    Post Interest, Training Fee or Commission to many dealers at once, each with its own amount.
     Everything is checked first — if any row has a problem, nothing is posted and every problem is listed.
     Commission for a month that the Commission module has already posted for a dealer is refused, so it can't be paid twice.
   </p>
@@ -10,6 +10,7 @@
       <label>Head</label>
       <select id="bulk-head" onchange="onBulkHeadChange()">
         <option value="Interest">Interest (debit — charged to dealer)</option>
+        <option value="Training Fee">Training Fee (debit — charged to dealer)</option>
         <option value="Commission">Commission (credit — paid to dealer)</option>
       </select>
     </div>

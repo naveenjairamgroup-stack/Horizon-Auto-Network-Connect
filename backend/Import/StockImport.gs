@@ -12,16 +12,15 @@
  *   - Only rows whose Physical Status is in STOCK_COUNTABLE_PHYSICAL_STATUSES
  *     ('Received-OK', 'In-Transit') count as real sitting inventory.
  *   - This is a point-in-time snapshot, not an accumulating transaction: every
- *     import fully REPLACES the previously stored inventory for every dealer
- *     that has an "Inventory Location Alias" configured — including wiping a
- *     dealer down to zero if they no longer appear in the new file at all.
+ *     import first wipes ALL previously stored inventory, then writes the new
+ *     file — so a dealer that no longer appears in the new file ends up at zero.
  *   - Inventory value posts as a REAL ledger Debit row (Head = 'Total Stock',
  *     Remarks = 'Inventory value', dated at the stock file's own date) —
  *     Honda has effectively already funded whatever is sitting unsold at the
  *     dealer, so it counts toward Outstanding / Credit Status / Dashboard
  *     totals exactly like Vehicle Sale or Parts Sale do, with zero extra code
  *     anywhere else in the system (they all already sum Ledger_Transactions).
- *   - Each new import DELETES the dealer's previous 'Total Stock' row outright
+ *   - Each new import DELETES every previous 'Total Stock' row outright
  *     (not a credit-note reversal like other heads) and inserts a fresh one —
  *     it's a snapshot of "right now", not a discrete transaction worth
  *     preserving in the audit trail forever. A dealer with zero stock in the
@@ -54,13 +53,11 @@ function processStockRows_(rows, fileDate) {
 
   var dealersWithAlias = getAllRows(SHEETS.DEALER_MASTER).filter(function (d) { return d['Inventory Location Alias']; });
 
-  // Wipe every configured dealer's prior detail snapshot first, so a dealer
-  // that no longer appears anywhere in the new file correctly ends up at
-  // zero rather than keeping stale rows forever.
-  dealersWithAlias.forEach(function (d) {
-    var oldRows = findRows(SHEETS.INVENTORY_DETAIL, { 'Dealer Code': d['Dealer Code'] });
-    if (oldRows.length) deleteRowsWhere_(SHEETS.INVENTORY_DETAIL, oldRows);
-  });
+  // The whole previous snapshot goes, in one call, before anything new is
+  // written. It used to be deleted dealer by dealer, row by row — slow, and
+  // the very last row could never be deleted (see deleteRowsWhere_), so the
+  // import failed and the old stock stayed forever.
+  clearInventoryDetail_();
 
   var aliasMap = {};
   dealersWithAlias.forEach(function (d) { aliasMap[normalizeName_(d['Inventory Location Alias'])] = d['Dealer Code']; });
@@ -92,45 +89,62 @@ function processStockRows_(rows, fileDate) {
   // typical stock file.
   appendRows(SHEETS.INVENTORY_DETAIL, detailRowsToInsert, 'System (Import)');
 
-  // Replace every configured dealer's "Total Stock" ledger row — including
-  // dealers who dropped to zero (not in this file at all), so their old
-  // line disappears instead of staying stale forever.
-  dealersWithAlias.forEach(function (d) {
-    postOrReplaceTotalStockLedgerRow_(d['Dealer Code'], totalsByDealer[d['Dealer Code']] || 0, fileDate);
-  });
+  replaceTotalStockLedgerRows_(dealersWithAlias, totalsByDealer, fileDate);
 
   return { processed: processed, skipped: skipped, updated: 0, reversed: 0 };
 }
 
+/** Empties Inventory_Detail below the header in one call. Rows stay, contents go. */
+function clearInventoryDetail_() {
+  var sheet = getSheet_(SHEETS.INVENTORY_DETAIL);
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    sheet.getRange(2, 1, lastRow - 1, Math.max(sheet.getLastColumn(), 1)).clearContent();
+  }
+  invalidateSheetCache_(SHEETS.INVENTORY_DETAIL);
+  logAction('System (Import)', 'CLEAR ' + SHEETS.INVENTORY_DETAIL, '', 'Previous stock snapshot cleared (' + Math.max(lastRow - 1, 0) + ' rows)');
+}
+
 /**
- * Deletes a dealer's existing "Total Stock" ledger row (if any) and — only
- * if there's actually stock to value — inserts a fresh one dated at the
- * stock file's own date. Unlike reverseLedgerEntry_ (used for Vehicle Sale /
- * Parts Sale corrections), this is a straight delete-and-replace: an
- * inventory snapshot from three days ago has no ongoing audit-trail value
- * once a newer one exists.
+ * Replaces every "Total Stock" ledger row with the new snapshot's values.
+ *
+ * ALL old Total Stock rows are removed — not only those of dealers with an
+ * alias today — so a dealer whose alias was later cleared doesn't keep an old
+ * stock value in its outstanding forever. A new row is written only where
+ * there is stock to value, dated at the snapshot date. This is a plain
+ * delete-and-replace rather than a reversal (unlike Vehicle/Parts Sale): an
+ * old inventory snapshot has no audit-trail value once a newer one exists.
  */
-function postOrReplaceTotalStockLedgerRow_(dealerCode, totalValue, asOfDate) {
-  var oldRows = findRows(SHEETS.LEDGER_TRANSACTIONS, { 'Dealer Code': dealerCode, 'Head': 'Total Stock' });
+function replaceTotalStockLedgerRows_(dealersWithAlias, totalsByDealer, asOfDate) {
+  var touched = {};
+  var oldRows = findRows(SHEETS.LEDGER_TRANSACTIONS, { 'Head': 'Total Stock' });
+  oldRows.forEach(function (r) { touched[r['Dealer Code']] = true; });
   if (oldRows.length) deleteRowsWhere_(SHEETS.LEDGER_TRANSACTIONS, oldRows);
 
-  if (totalValue > 0) {
-    appendRow(SHEETS.LEDGER_TRANSACTIONS, {
+  var newRows = [];
+  dealersWithAlias.forEach(function (d) {
+    var code = d['Dealer Code'];
+    touched[code] = true;
+    var total = totalsByDealer[code] || 0;
+    if (!(total > 0)) return;
+    newRows.push({
       'Entry ID': generateId('LED'),
       'Date': asOfDate,
       'Invoice No': '',
       'Head': 'Total Stock',
-      'Dealer Code': dealerCode,
-      'Debit': totalValue,
+      'Dealer Code': code,
+      'Debit': total,
       'Credit': 0,
       'Running Balance': 0,
       'Remarks': 'Inventory value',
       'Created By': 'System (Import)',
       'Timestamp': new Date(),
       'Invoice Date': asOfDate
-    }, 'System (Import)');
-  }
-  recomputeRunningBalance_(dealerCode);
+    });
+  });
+  appendRows(SHEETS.LEDGER_TRANSACTIONS, newRows, 'System (Import)');
+
+  Object.keys(touched).forEach(function (code) { recomputeRunningBalance_(code); });
 }
 
 /**

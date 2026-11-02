@@ -49,6 +49,7 @@ function setupDatabase() {
   seedFirstAdmin_();
   seedCommissionConfig_();
   ensureVoucherHead_('Interest');
+  ensureVoucherHead_('Training Fee');
   Logger.log('Database setup complete.');
 }
 
