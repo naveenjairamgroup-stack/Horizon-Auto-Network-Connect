@@ -27,15 +27,18 @@ var rangeInitialised = false;
 var lastLedger = null;
 
 // ------------------------------------------------------------ Month filter -
-var MONTHS_LISTED = 24;
+// The system's first month — opening balances are as on 01-08-2026 and
+// nothing earlier is imported (IMPORT_FIRST_DATE in backend/Config.gs), so
+// earlier months would only ever show an empty ledger.
+var FIRST_MONTH = '2026-08';
 
-/** 'YYYY-MM' for this month and the 23 before it, newest first (India time). */
+/** 'YYYY-MM' from this month back to FIRST_MONTH, newest first (India time). */
 function monthKeys_() {
   var t = todayIst_();
   var y = Number(t.slice(0, 4)), m = Number(t.slice(5, 7));
   var out = [];
-  for (var i = 0; i < MONTHS_LISTED; i++) {
-    out.push(y + '-' + String(m).padStart(2, '0'));
+  for (var key = t.slice(0, 7); key >= FIRST_MONTH; key = y + '-' + String(m).padStart(2, '0')) {
+    out.push(key);
     if (--m === 0) { m = 12; y--; }
   }
   return out;
