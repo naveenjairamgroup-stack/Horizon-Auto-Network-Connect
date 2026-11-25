@@ -50,7 +50,7 @@ import {
   onBulkHeadChange, addBulkRow, removeBulkRow, addAllBulkDealers, clearBulkRows,
   updateBulkTotal, postBulkEntries
 } from './pages/bulkEntry.js';
-import { setLedgerRange, applyLedgerRange } from './pages/ledger.js';
+import { setLedgerRange, applyLedgerRange, setLedgerMonth, downloadLedger } from './pages/ledger.js';
 import { toggleSidebar, closeSidebar, initMobileTables } from './mobile.js';
 
 // ---- Public surface for inline onclick="..." / onchange="..." handlers ---
@@ -111,6 +111,8 @@ window.loadPayments = loadPayments;
 window.clearPaymentFilters = clearPaymentFilters;
 window.setLedgerRange = setLedgerRange;
 window.applyLedgerRange = applyLedgerRange;
+window.setLedgerMonth = setLedgerMonth;
+window.downloadLedger = downloadLedger;
 window.handleImportUpload = handleImportUpload;
 window.onImportTypeChange = onImportTypeChange;
 window.loadReview = loadReview;

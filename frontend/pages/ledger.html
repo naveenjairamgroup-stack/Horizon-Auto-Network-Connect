@@ -14,15 +14,29 @@
       <div><span class="badge badge-green" id="ledger-credit-badge">&mdash;</span></div>
     </div>
   </div>
-  <div class="filter-row">
-    <div><label>From</label><input id="ledger-from" type="date"></div>
-    <div><label>To</label><input id="ledger-to" type="date"></div>
-    <div><button type="button" onclick="applyLedgerRange()">Show</button></div>
-    <div><button type="button" onclick="setLedgerRange('month')">This month</button></div>
-    <div><button type="button" onclick="setLedgerRange('fy')">This FY</button></div>
-    <div><button type="button" onclick="setLedgerRange('all')">All time</button></div>
-    <div id="ledger-range-label" class="muted" style="align-self:center;"></div>
+  <div class="ledger-toolbar">
+    <div class="lt-field"><label for="ledger-from">From</label><input id="ledger-from" type="date"></div>
+    <div class="lt-field"><label for="ledger-to">To</label><input id="ledger-to" type="date"></div>
+    <div class="lt-field lt-month"><label for="ledger-month">Month</label>
+      <select id="ledger-month" onchange="setLedgerMonth(this.value)"></select></div>
+    <div class="lt-buttons">
+      <button type="button" class="lt-btn lt-btn-primary" onclick="applyLedgerRange()">Show</button>
+      <div class="lt-group">
+        <button type="button" class="lt-btn" onclick="setLedgerRange('month')">This month</button>
+        <button type="button" class="lt-btn" onclick="setLedgerRange('fy')">This FY</button>
+        <button type="button" class="lt-btn" onclick="setLedgerRange('all')">All time</button>
+      </div>
+    </div>
+    <div class="lt-export">
+      <button type="button" class="lt-icon" onclick="downloadLedger('pdf', this)" title="Download PDF" aria-label="Download PDF">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M7 2h13l7 7v19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#fff" stroke="#c8102e" stroke-width="1.6"/><path d="M20 2v7h7" fill="none" stroke="#c8102e" stroke-width="1.6"/><rect x="3" y="15" width="21" height="10" rx="2" fill="#c8102e"/><text x="13.5" y="22.6" text-anchor="middle" font-family="Arial,sans-serif" font-size="7.2" font-weight="700" fill="#fff">PDF</text></svg>
+      </button>
+      <button type="button" class="lt-icon" onclick="downloadLedger('xlsx', this)" title="Download Excel" aria-label="Download Excel">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M7 2h13l7 7v19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#fff" stroke="#1d7044" stroke-width="1.6"/><path d="M20 2v7h7" fill="none" stroke="#1d7044" stroke-width="1.6"/><rect x="3" y="15" width="21" height="10" rx="2" fill="#1d7044"/><text x="13.5" y="22.6" text-anchor="middle" font-family="Arial,sans-serif" font-size="7.2" font-weight="700" fill="#fff">XLS</text></svg>
+      </button>
+    </div>
   </div>
+  <div id="ledger-range-label" class="muted" style="margin:-4px 0 4px;"></div>
   <table>
     <thead><tr><th>Date</th><th>Head</th><th>Invoice no.</th><th>Particulars</th><th>Debit</th><th>Credit</th><th>Running balance</th><th></th></tr></thead>
     <tbody id="ledger-table-body"></tbody>

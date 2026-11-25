@@ -26,7 +26,7 @@ function runAscVehicleSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.VEHICLE_SALE);
   var total = newCounts_();
   files.forEach(function (file) {
-    var c = processAscVehicleRows_(readTsvUtf16File_(file));
+    var c = processAscVehicleRows_(dropRowsBeforeGoLive_(readTsvUtf16File_(file), 'Invoice Date').rows);
     logImportRun_(file.getName(), 'Vehicle_Sale', c.processed, c.skipped, c.updated, c.reversed, 'Success');
     addCounts_(total, c);
   });

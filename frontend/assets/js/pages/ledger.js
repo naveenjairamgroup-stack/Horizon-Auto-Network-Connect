@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { session } from '../session.js';
 import { jsArg_, formatMoney_, formatDateDisplay_, showToast_, esc_, currentMonthRange_, todayIst_ } from '../utils.js';
+import { exportLedger_ } from '../ledgerExport.js';
 
 export function loadDealerDropdowns() {
   api('listDealers', session.token).then(function (dealers) {
@@ -22,6 +23,89 @@ export function onLedgerDealerChange() {
 
 var currentDealer = '';
 var rangeInitialised = false;
+// What is on screen right now — the PDF / Excel download writes exactly this.
+var lastLedger = null;
+
+// ------------------------------------------------------------ Month filter -
+var MONTHS_LISTED = 24;
+
+/** 'YYYY-MM' for this month and the 23 before it, newest first (India time). */
+function monthKeys_() {
+  var t = todayIst_();
+  var y = Number(t.slice(0, 4)), m = Number(t.slice(5, 7));
+  var out = [];
+  for (var i = 0; i < MONTHS_LISTED; i++) {
+    out.push(y + '-' + String(m).padStart(2, '0'));
+    if (--m === 0) { m = 12; y--; }
+  }
+  return out;
+}
+
+function monthBounds_(ym) {
+  var y = Number(ym.slice(0, 4)), m = Number(ym.slice(5, 7));
+  return { from: ym + '-01', to: ym + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0') };
+}
+
+function fillMonthSelect_() {
+  var sel = document.getElementById('ledger-month');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— choose —</option>' + monthKeys_().map(function (k) {
+    var label = new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, 1)
+      .toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+    return '<option value="' + k + '">' + label + '</option>';
+  }).join('');
+}
+
+/** Shows the month in the dropdown when From/To are exactly one whole month, otherwise blank. */
+function syncMonthSelect_(from, to) {
+  var sel = document.getElementById('ledger-month');
+  if (!sel) return;
+  var match = '';
+  if (from && to && from.slice(0, 7) === to.slice(0, 7)) {
+    var b = monthBounds_(from.slice(0, 7));
+    if (b.from === from && b.to === to) match = from.slice(0, 7);
+  }
+  sel.value = match;
+}
+
+export function setLedgerMonth(ym) {
+  if (!ym) return;
+  var b = monthBounds_(ym);
+  document.getElementById('ledger-from').value = b.from;
+  document.getElementById('ledger-to').value = b.to;
+  if (currentDealer) loadLedger(currentDealer);
+}
+
+/** Download what the ledger currently shows. kind: 'pdf' | 'xlsx'. */
+export function downloadLedger(kind, button) {
+  if (!lastLedger || lastLedger.dealerCode !== currentDealer) {
+    showToast_(new Error('Ledger is still loading — try again in a moment.'));
+    return;
+  }
+  // Not withBusy_: that swaps the button's text, which would wipe the icon.
+  if (button.disabled) return;
+  button.disabled = true;
+  exportLedger_(kind, lastLedger)
+    .catch(function (err) { showToast_(err); })
+    .then(function () { button.disabled = false; });
+}
+
+/** Signed balance as Tally shows it: ₹52,87,650.77 Cr — amount without a minus sign, side in words. */
+function balanceText_(n) {
+  var v = Number(n) || 0;
+  if (Math.abs(v) < 0.005) return formatMoney_(0);
+  return formatMoney_(Math.abs(v)) + (v > 0 ? ' Dr' : ' Cr');
+}
+
+function dealerLabel_(dealerCode) {
+  var sel = document.getElementById('ledger-dealer-select');
+  var opt = sel && sel.selectedOptions && sel.selectedOptions[0];
+  if (session.role === 'Dealer' || !opt || opt.value !== dealerCode) {
+    return { code: dealerCode, name: session.role === 'Dealer' ? (session.fullName || '') : '' };
+  }
+  var parts = opt.textContent.split(' — ');
+  return { code: dealerCode, name: parts.slice(1).join(' — ') };
+}
 
 /**
  * Sets the From/To boxes. 'month' (the default every time the ledger opens),
@@ -58,11 +142,13 @@ export function loadLedger(dealerCode) {
     var r0 = currentMonthRange_();
     document.getElementById('ledger-from').value = r0.from;
     document.getElementById('ledger-to').value = r0.to;
+    fillMonthSelect_();
     rangeInitialised = true;
   }
   currentDealer = dealerCode;
   var from = document.getElementById('ledger-from').value;
   var to = document.getElementById('ledger-to').value;
+  syncMonthSelect_(from, to);
   document.getElementById('ledger-range-label').textContent =
     (from || to) ? ('Showing ' + (from ? formatDateDisplay_(from + 'T00:00:00+05:30') : 'start') + ' to ' +
       (to ? formatDateDisplay_(to + 'T00:00:00+05:30') : 'today')) : 'Showing all time';
@@ -72,7 +158,9 @@ export function loadLedger(dealerCode) {
   api('getLedger', session.token, dealerCode, from, to).then(function (res) {
     // Older backends returned a bare array with no summary; keep working with it.
     var rows = Array.isArray(res) ? res : (res && res.rows) || [];
-    renderLedgerFooter_(Array.isArray(res) ? null : res && res.summary);
+    var summary = Array.isArray(res) ? null : res && res.summary;
+    renderLedgerFooter_(summary);
+    lastLedger = { dealerCode: dealerCode, dealer: dealerLabel_(dealerCode), from: from, to: to, rows: rows, summary: summary };
     var tbody = document.getElementById('ledger-table-body');
     tbody.innerHTML = '';
     var invoiceDetailHeads = ['Vehicle Sale', 'Parts Sale', 'Finance Company Advance'];
@@ -89,7 +177,7 @@ export function loadLedger(dealerCode) {
         '<td>' + esc_(r.Remarks || '') + '</td>' +
         '<td>' + (Number(r.Debit) ? formatMoney_(r.Debit) : '') + '</td>' +
         '<td>' + (Number(r.Credit) ? formatMoney_(r.Credit) : '') + '</td>' +
-        '<td>' + formatMoney_(r['Running Balance']) + '</td>' +
+        '<td>' + balanceText_(r['Running Balance']) + '</td>' +
         '<td>' + viewBtn + '</td>';
       tbody.appendChild(tr);
     });
@@ -97,7 +185,7 @@ export function loadLedger(dealerCode) {
 
   api('getCreditStatus', session.token, dealerCode).then(function (status) {
     var el = document.getElementById('ledger-outstanding');
-    el.textContent = formatMoney_(status.outstanding);
+    el.textContent = balanceText_(status.outstanding);
     var badge = document.getElementById('ledger-credit-badge');
     badge.textContent = status.status + ' \u00b7 ' + status.usedPercent + '% of limit used';
     badge.className = 'badge badge-' + status.status.toLowerCase();

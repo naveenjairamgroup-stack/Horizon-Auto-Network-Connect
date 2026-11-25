@@ -16,7 +16,7 @@ function runInterDealerSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.INTER_DEALER);
   var total = newCounts_();
   files.forEach(function (file) {
-    var c = processInterDealerRows_(readTsvUtf16File_(file));
+    var c = processInterDealerRows_(dropRowsBeforeGoLive_(readTsvUtf16File_(file), 'Invoice Date').rows);
     logImportRun_(file.getName(), 'Inter_Dealer', c.processed, c.skipped, c.updated, c.reversed, 'Success');
     addCounts_(total, c);
   });

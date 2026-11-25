@@ -25,7 +25,7 @@ function runPartsSaleImport_(actor) {
   var files = listFilesInFolder_(IMPORT_SUBFOLDERS.PARTS);
   var total = newCounts_();
   files.forEach(function (file) {
-    var c = processPartsRows_(readCsvUtf8File_(file));
+    var c = processPartsRows_(dropRowsBeforeGoLive_(readCsvUtf8File_(file), 'Invoice Date').rows);
     logImportRun_(file.getName(), 'Parts', c.processed, c.skipped, c.updated, c.reversed, 'Success');
     addCounts_(total, c);
   });

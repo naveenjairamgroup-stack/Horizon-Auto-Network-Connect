@@ -307,6 +307,11 @@ var IMPORT_TYPES = {
   }
 };
 
+// Go-live date ('YYYY-MM-DD'). Every dealer's opening balance (from Tally) is
+// as on this date and already includes everything before it, so import rows
+// dated earlier are skipped — posting them would count those bills twice.
+var IMPORT_FIRST_DATE = '2026-08-01';
+
 // Apps Script has a hard 6-minute limit per request. Files this big are
 // refused up front with a clear message instead of failing half-way.
 var IMPORT_MAX_BYTES = 8 * 1024 * 1024;

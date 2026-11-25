@@ -84,6 +84,8 @@ export function handleImportUpload(button) {
     }).then(function (r) {
       out.innerHTML = '<div class="import-ok"><strong>' + esc_(r.label) + ' imported.</strong> ' +
         r.rows + ' row(s) read' + (r.ignoredRows ? ' (' + r.ignoredRows + ' blank/summary row(s) ignored)' : '') + '. ' +
+        (r.tooOldRows ? '<br><strong>' + r.tooOldRows + ' row(s) dated before ' + esc_(r.goLive) +
+          ' skipped</strong> — that period is already in the opening balances.<br>' : '') +
         'New: ' + r.processed + ' · Already there / not ours: ' + r.skipped +
         ' · Updated: ' + r.updated + ' · Reversed: ' + r.reversed +
         '<br>Data till: <strong>' + formatDateDisplay_(r.dataTill) + '</strong></div>';

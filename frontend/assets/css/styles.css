@@ -111,6 +111,36 @@
 .import-ok { background: #f1f8f2; border: 1px solid #c4e2c8; color: #1f5f27; padding: 10px 12px; border-radius: 4px; font-size: 13px; }
 .muted { color: #888; font-size: 12px; }
 
+/* ---- Ledger toolbar: dates, month, range buttons, downloads ------------
+   Everything sits on one baseline: buttons are exactly the height of the
+   inputs, and the two download icons are pushed to the right edge. */
+.ledger-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; margin-bottom: 12px; }
+.ledger-toolbar .lt-field { display: flex; flex-direction: column; width: 160px; }
+.ledger-toolbar .lt-field.lt-month { width: 140px; }
+.ledger-toolbar .lt-field label { margin-bottom: 4px; }
+.ledger-toolbar input, .ledger-toolbar select { height: 36px; padding: 6px 8px; }
+.lt-buttons { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.lt-btn {
+  height: 36px; padding: 0 14px; font-size: 13px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  background: #fff; color: #333; border: 1px solid #ccc; border-radius: 4px;
+}
+.lt-btn:hover { background: #f5f5f5; }
+.lt-btn-primary { background: #c8102e; border-color: #c8102e; color: #fff; font-weight: bold; }
+.lt-btn-primary:hover { background: #a90d26; }
+.lt-group { display: inline-flex; }
+.lt-group .lt-btn { border-radius: 0; margin-left: -1px; }
+.lt-group .lt-btn:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.lt-group .lt-btn:last-child { border-radius: 0 4px 4px 0; }
+.lt-export { margin-left: auto; display: flex; gap: 6px; align-items: flex-end; }
+.lt-icon {
+  width: 40px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.lt-icon:hover { background: #f5f5f5; border-color: #e3e3e3; }
+.lt-icon:disabled { opacity: 0.5; cursor: wait; }
+
+#ledger-table-body td:first-child { white-space: nowrap; }
+
 /* ---- Ledger footer (Tally-style opening / current total / closing) ---- */
 .ledger-foot td { font-weight: 600; background: #fafafa; }
 .ledger-foot .lf-label { text-align: right; color: #555; }
@@ -330,6 +360,20 @@
   table.rtable tfoot td { display: block; border: none; padding: 0; background: none; }
   table.rtable tfoot td:empty { display: none; }
   table.rtable tfoot .lf-label { flex: 1 1 100%; text-align: left; }
+
+  /* ---- Ledger toolbar on a phone: dates side by side, month full line,
+          buttons share the width, downloads at the end of the row ---- */
+  .ledger-toolbar { gap: 8px; }
+  .ledger-toolbar .lt-field { width: calc(50% - 4px); }
+  .ledger-toolbar .lt-field.lt-month { width: 100%; }
+  .ledger-toolbar input, .ledger-toolbar select { height: 42px; }
+  .lt-buttons { width: 100%; }
+  .lt-buttons > .lt-btn-primary { flex: 1 1 100%; }
+  .lt-group { flex: 1 1 100%; }
+  .lt-group .lt-btn { flex: 1; padding: 0 6px; }
+  .lt-btn { height: 42px; min-height: 0; }
+  .lt-export { margin-left: 0; width: 100%; justify-content: flex-end; }
+  .lt-icon { min-height: 0; width: 46px; height: 42px; }
 
   /* ---- Ledger: opening/closing footer stays readable ---- */
   .ledger-foot tr.lf-closing td { font-size: 15px; }

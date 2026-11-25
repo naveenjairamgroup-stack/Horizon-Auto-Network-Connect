@@ -16,6 +16,8 @@
  *    whom it was first imported. (A file that FAILED can be uploaded again.)
  *  - "DATA TILL" is recorded: the latest invoice date in the file, or the
  *    upload date for a stock snapshot.
+ *  - ROWS DATED BEFORE GO-LIVE (IMPORT_FIRST_DATE) ARE SKIPPED and counted;
+ *    the opening balances already contain them.
  */
 
 /** Rows with no value in this column are summary/blank lines, not data. */
@@ -72,6 +74,18 @@ function uploadImportFile(token, importType, fileName, base64) {
         'Every row has an empty "' + keyCol + '". No data to import.');
     }
 
+    var tooOld = 0;
+    if (spec.dateColumn) {
+      var cut = dropRowsBeforeGoLive_(dataRows, spec.dateColumn);
+      tooOld = cut.dropped;
+      if (!cut.rows.length) {
+        return rejectUpload_(hash, fileName, importType, session.username,
+          'Every row in this file is dated before ' + goLiveLabel_() + '. Data before that date is already in the ' +
+          'opening balances, so it cannot be imported. Nothing was changed.');
+      }
+      dataRows = cut.rows;
+    }
+
     var dataTill = new Date();
     if (spec.dateColumn) {
       var latest = null;
@@ -111,11 +125,44 @@ function uploadImportFile(token, importType, fileName, base64) {
     return {
       importType: importType, label: spec.label, fileName: fileName,
       rows: dataRows.length, ignoredRows: ignored,
+      tooOldRows: tooOld, goLive: goLiveLabel_(),
       processed: counts.processed, skipped: counts.skipped,
       updated: counts.updated || 0, reversed: counts.reversed || 0,
       dataTill: dataTill
     };
   });
+}
+
+/**
+ * Splits off rows dated before IMPORT_FIRST_DATE (see Config.gs). Used by the
+ * portal upload and the Drive importers alike, so no path can post pre-go-live
+ * bills on top of the opening balances that already contain them. A row whose
+ * date can't be read is kept — the importers decide what to do with it, as
+ * before.
+ */
+function dropRowsBeforeGoLive_(rows, dateColumn) {
+  var first = goLiveDate_();
+  var kept = rows.filter(function (r) {
+    var raw = r[dateColumn];
+    if (!raw || !String(raw).trim()) return true;
+    var d = parseInvoiceDate_(raw);
+    return isNaN(d.getTime()) || d >= first;
+  });
+  return { rows: kept, dropped: rows.length - kept.length };
+}
+
+/**
+ * Midnight at the start of the go-live day, India time (the script's time
+ * zone). Not new Date('YYYY-MM-DD'): that reads as UTC midnight, i.e. 05:30
+ * IST, and would wrongly drop bills made before 05:30 on the first day.
+ */
+function goLiveDate_() {
+  var p = IMPORT_FIRST_DATE.split('-');
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+}
+
+function goLiveLabel_() {
+  return Utilities.formatDate(goLiveDate_(), 'Asia/Kolkata', 'dd-MM-yyyy');
 }
 
 /** Logs a refused upload (so there is a trail) and throws its reason to the user. */
